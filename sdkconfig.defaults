@@ -1,0 +1,80 @@
+CONFIG_IDF_TARGET="esp32c6"
+
+# Do not change the settings below this line.
+
+# A floor, not the module size. A header under the chip's real size leaves the
+# tail unused, and one over it will not boot.
+CONFIG_ESPTOOLPY_FLASHSIZE_2MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Verbose logging can outrun the 115200 default and stall the logging task until
+# the task watchdog fires. The baud is only settable on a custom console, whose
+# pins default to the same UART0 pair.
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=921600
+
+# Sized for the WiFi + MQTT + JSON work app_main runs on this stack
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+CONFIG_ESP_TASK_WDT_INIT=y
+# Bounds how long a hung control loop leaves the pump running. About three times
+# the longest normal gap between a watched task's check-ins.
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=3
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+
+# A crash writes a core dump to the coredump partition before the reset. Only
+# the first one is kept, because a crash loop rewriting it would wear out that
+# flash.
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_FLASH_NO_OVERWRITE=y
+# The dump runs on a stack of its own, since a task that overflowed its stack
+# has none left for it. 2 KB covers the CRC32 checksum the dump computes.
+CONFIG_ESP_COREDUMP_STACK_SIZE=2048
+# The firmware checks the stored dump at boot itself, and ESP-IDF's check would read
+# it a second time.
+CONFIG_ESP_COREDUMP_CHECK_BOOT=n
+
+# On one machine the same source and config build the same image, which a core
+# dump still decodes against after a rebuild. Debug info names placeholders such
+# as /IDF_PROJECT for paths, and the build's gdbinit/prefix_map maps them back.
+CONFIG_APP_REPRODUCIBLE_BUILD=y
+
+# A function holding a buffer on its stack checks a guard value before it
+# returns, and resets the device rather than return through an address an
+# overflow wrote. Strong also covers non-char arrays and locals whose address
+# is taken.
+CONFIG_COMPILER_STACK_CHECK_MODE_STRONG=y
+
+# The sensor spaces its samples 1 ms apart. At ESP-IDF's default 100 Hz that
+# rounds to no delay at all, and the samples run back to back.
+CONFIG_FREERTOS_HZ=1000
+
+# The 1024 B default is only just over what browsers send (700-900 B with
+# client hints), and a request past the limit is answered with 431 and the
+# connection dropped.
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
+
+# The firmware runs on IPv4 alone. Left on, the IPv6 stack is built in although
+# no interface is ever given an IPv6 address.
+CONFIG_LWIP_IPV6=n
+
+# The station joins with a password or with none, never with an enterprise
+# login.
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+
+# The firmware talks over WiFi alone and never starts the 802.15.4 radio, whose
+# driver also brings in its coexistence with WiFi.
+CONFIG_IEEE802154_ENABLED=n
+
+# Nothing reads a directory or sets a serial port's terminal mode.
+CONFIG_VFS_SUPPORT_DIR=n
+CONFIG_VFS_SUPPORT_TERMIOS=n
+
+# The broker is reached over plain TCP or TLS, never over a websocket.
+CONFIG_MQTT_TRANSPORT_WEBSOCKET=n
+
+# A broker set to TLS 1.3 only refuses a 1.2 client. With both on, the client
+# offers 1.3 and falls back to 1.2.
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y

@@ -1,0 +1,8 @@
+CompileFlags:
+    CompilationDatabase: build
+    Remove: [-f*, -m*]
+Diagnostics:
+    Includes:
+        # FreeRTOS.h must precede task.h and queue.h, and defines pdMS_TO_TICKS.
+        # include-cleaner misreads it as unused.
+        IgnoreHeader: ['freertos/FreeRTOS\.h']

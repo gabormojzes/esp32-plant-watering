@@ -1,0 +1,7 @@
+# The compile-time ceiling (LOG_MAXIMUM_LEVEL) follows the default level.
+CONFIG_LOG_DEFAULT_LEVEL_VERBOSE=y
+
+# Lets the periodic memory log enumerate every task's stack headroom, which is
+# how a stack sized too small shows up before it overflows. It grows every task
+# control block, and prod leaves it off.
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y

@@ -1,0 +1,11 @@
+# The compile-time ceiling follows the default level; the format strings
+# leave the build rather than being suppressed at runtime. The bootloader has a
+# level of its own.
+CONFIG_LOG_DEFAULT_LEVEL_NONE=y
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+
+# -Os instead of the default -Og.
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Keep asserts active but drop their file/line/expression strings to save flash.
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y

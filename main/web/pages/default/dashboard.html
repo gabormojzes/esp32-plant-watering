@@ -1,0 +1,2505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Plant watering</title>
+<style>
+  :root {
+    --bg: #f1f0ec;
+    --edge: #d6d3cb;
+    --raised: #f8f7f4;
+    --ink: #3a3732;
+    --ink-2: #5f5b54;
+    --ink-3: #716d66;
+    --line: #e0ded7;
+    --run-tint: rgba(113, 109, 102, 0.10);
+    --state-none: #5a6270;
+    --state-ok: #2f7d5b;
+    --state-warning: #9f681f;
+    --state-wet: #2f6aa8;
+    --state-error: #b83a3a;
+    --state-none-ink: #5a6270;
+    --state-ok-ink: #2f7d5b;
+    --state-warning-ink: #8a5a17;
+    --state-wet-ink: #2f6aa8;
+    --state-error-ink: #b83a3a;
+    --state-none-tint: rgba(90, 98, 112, 0.08);
+    --state-ok-tint: rgba(47, 125, 91, 0.10);
+    --state-warning-tint: rgba(159, 104, 31, 0.10);
+    --state-wet-tint: rgba(47, 106, 168, 0.10);
+    --state-error-tint: rgba(184, 58, 58, 0.09);
+    --chip-error: #9a2e2e;
+    --chip-warning: #7a4f14;
+    --chip-error-fill: #f7e0dd;
+    --chip-warning-fill: #f5e7d0;
+    --control-height: 28px;
+    --field-height: 36px;
+    color-scheme: light;
+  }
+  /* The OS preference decides until the theme button stores a choice. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121211;
+      --ink: #dcd9d2;
+      --ink-2: #aaa69e;
+      --ink-3: #85827b;
+      --line: #2a2926;
+      --run-tint: rgba(133, 130, 123, 0.12);
+      --edge: #3a3834;
+      --raised: #1c1b19;
+      --state-none: #30343b;
+      --state-ok: #1f5a40;
+      --state-warning: #6f4a15;
+      --state-wet: #1e4570;
+      --state-error: #772626;
+      --state-none-ink: #9a978f;
+      --state-ok-ink: #5cc494;
+      --state-warning-ink: #e3aa55;
+      --state-wet-ink: #6fa8e6;
+      --state-error-ink: #ef7474;
+      --state-none-tint: rgba(154, 151, 143, 0.10);
+      --state-ok-tint: rgba(92, 196, 148, 0.12);
+      --state-warning-tint: rgba(227, 170, 85, 0.12);
+      --state-wet-tint: rgba(111, 168, 230, 0.12);
+      --state-error-tint: rgba(239, 116, 116, 0.12);
+      --chip-error: #772626;
+      --chip-warning: #6f4a15;
+      --chip-error-fill: #e8cbc7;
+      --chip-warning-fill: #e6d5ba;
+      color-scheme: dark;
+    }
+  }
+  /* A stored dark choice, which a light OS preference must not undo */
+  :root[data-theme="dark"] {
+    --bg: #121211;
+    --ink: #dcd9d2;
+    --ink-2: #aaa69e;
+    --ink-3: #85827b;
+    --line: #2a2926;
+    --run-tint: rgba(133, 130, 123, 0.12);
+    --edge: #3a3834;
+    --raised: #1c1b19;
+    --state-none: #30343b;
+    --state-ok: #1f5a40;
+    --state-warning: #6f4a15;
+    --state-wet: #1e4570;
+    --state-error: #772626;
+    --state-none-ink: #9a978f;
+    --state-ok-ink: #5cc494;
+    --state-warning-ink: #e3aa55;
+    --state-wet-ink: #6fa8e6;
+    --state-error-ink: #ef7474;
+    --state-none-tint: rgba(154, 151, 143, 0.10);
+    --state-ok-tint: rgba(92, 196, 148, 0.12);
+    --state-warning-tint: rgba(227, 170, 85, 0.12);
+    --state-wet-tint: rgba(111, 168, 230, 0.12);
+    --state-error-tint: rgba(239, 116, 116, 0.12);
+    --chip-error: #772626;
+    --chip-warning: #6f4a15;
+    --chip-error-fill: #e8cbc7;
+    --chip-warning-fill: #e6d5ba;
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  body, h1, h2, h3, p, dl, dd, pre { margin: 0; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; opacity: 0.8; }
+  @keyframes pulse { 50% { opacity: 0.25; } }
+  .chart { position: relative; height: 260px; }
+  .chart canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; }
+  .chart__tip {
+    position: absolute;
+    top: 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .chart__tip strong { display: block; font-size: 14px; font-weight: 500; }
+  summary { cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  pre {
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    max-height: 280px;
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  .container { width: 100%; margin: 0 auto; padding: 0 16px; }
+  @media (min-width: 576px) { .container { max-width: 540px; padding: 0 12px; } }
+  @media (min-width: 768px) { .container { max-width: 720px; } }
+  @media (min-width: 992px) { .container { max-width: 960px; } }
+
+  :root {
+    --state-fill: var(--state-none);
+    --trace: var(--state-none-ink);
+    --trace-tint: var(--state-none-tint);
+  }
+  :root[data-state="ok"] {
+    --state-fill: var(--state-ok);
+    --trace: var(--state-ok-ink);
+    --trace-tint: var(--state-ok-tint);
+  }
+  :root[data-state="warning"] {
+    --state-fill: var(--state-warning);
+    --trace: var(--state-warning-ink);
+    --trace-tint: var(--state-warning-tint);
+  }
+  :root[data-state="wet"] {
+    --state-fill: var(--state-wet);
+    --trace: var(--state-wet-ink);
+    --trace-tint: var(--state-wet-tint);
+  }
+  :root[data-state="error"] {
+    --state-fill: var(--state-error);
+    --trace: var(--state-error-ink);
+    --trace-tint: var(--state-error-tint);
+  }
+
+  /* A band running out to the window's edges would otherwise add a sideways scroll. */
+  .state {
+    padding: 18px 0 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.14)) var(--state-fill);
+    color: #fff;
+    overflow-x: clip;
+  }
+  [data-connection="offline"] .soil, [data-connection="offline"] .pump { opacity: 0.6; }
+  [data-connection="offline"] main { opacity: 0.5; }
+  .soil, .pump, main { transition: opacity 0.3s; }
+  .state[data-live] { transition: background-color 0.8s ease; }
+  .state :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  main summary:focus-visible { outline: 2px solid var(--trace); outline-offset: 2px; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand__title { font-size: 16px; font-weight: 600; }
+  .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--control-height);
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .chip[data-tone="error"] { background: var(--chip-error-fill); color: var(--chip-error); }
+  .chip[data-tone="warning"] { background: var(--chip-warning-fill); color: var(--chip-warning); }
+  a.chip[data-tone="error"]:hover { background: color-mix(in srgb, var(--chip-error-fill) 88%, var(--chip-error)); }
+  a.chip[data-tone="warning"]:hover { background: color-mix(in srgb, var(--chip-warning-fill) 88%, var(--chip-warning)); }
+  /* The sensor chip stays on the band's own light, whatever it says. */
+  .chip--state[data-tone] { background: rgba(255, 255, 255, 0.1); color: inherit; }
+  .button {
+    height: var(--control-height);
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 0;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .button:hover { background: rgba(255, 255, 255, 0.16); }
+  .button--icon { width: var(--control-height); padding: 0; display: grid; place-items: center; background: none; }
+  .button__icon { display: none; }
+  .button--theme[data-choice="system"] [data-icon="system"],
+  .button--theme[data-choice="light"] [data-icon="light"],
+  .button--theme[data-choice="dark"] [data-icon="dark"] { display: block; }
+  a.chip { color: inherit; text-decoration: none; }
+  /* While live, the connection is there for screen readers alone. */
+  .chip--connection[data-tone="none"] { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  a.chip[data-tone="none"]:hover { background: rgba(255, 255, 255, 0.16); }
+  .chip--network { width: var(--control-height); padding: 0; justify-content: center; background: none; }
+  .chip--network[data-connected="false"] { opacity: 0.4; }
+  @media (max-width: 991.98px) {
+    .chip--connection .chip__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .chip--connection:not([data-tone="none"]) { width: var(--control-height); padding: 0; justify-content: center; }
+  }
+  @media (max-width: 767.98px) {
+    .brand__title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
+  @media (max-width: 575.98px) {
+    .tools { gap: 6px; }
+    .chip, .button:not(.button--icon) { padding: 0 8px; }
+  }
+
+  .trend { display: flex; align-items: center; gap: 6px; }
+  .trend svg { flex: none; transition: transform 0.45s ease; }
+  .trend[data-direction="down"] svg { transform: rotate(180deg); }
+  .trend[data-direction="flat"] svg { transform: rotate(90deg); }
+  .trend[data-direction="none"] svg { display: none; }
+
+  .soil__title { font-size: 14px; font-weight: 500; opacity: 0.85; translate: 0 -1px; }
+  .soil { padding: 24px 0 14px; text-align: center; }
+  .soil__head { display: flex; justify-content: center; align-items: center; gap: 10px; }
+  /* The big number takes its digits' own widths, since a fixed-width 1 leaves a gap before the unit. */
+  .soil__value { margin-top: 10px; font-size: clamp(72px, 10vw, 96px); font-weight: 300; line-height: 1; letter-spacing: -0.045em; white-space: nowrap; font-variant-numeric: proportional-nums; }
+  .soil__value small { font-size: 0.34em; opacity: 0.85; letter-spacing: 0; }
+  .soil__facts { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 6px 24px; margin-top: 17px; font-size: 13px; }
+  .soil__figures { display: flex; gap: 24px; }
+  .soil__figures div { display: flex; gap: 6px; }
+  .trend b, .soil__figures dd { font-weight: 600; }
+  .trend__unit, .soil__figures dt { opacity: 0.8; }
+  .trend small, .soil__figures small { margin-left: 1px; font-size: 11px; font-weight: 400; opacity: 0.85; }
+
+  /* The pump docks along the band's lower edge, edge to edge. */
+  .pump { margin: 14px calc(50% - 50vw) -20px; background: rgba(255, 255, 255, 0.08); }
+  .pump__inner { padding-top: 16px; padding-bottom: 18px; }
+  .pump__top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+
+  .pump__lead { display: flex; align-items: baseline; gap: 8px; }
+  .pump__disc { display: grid; place-items: center; align-self: center; translate: 0 -1px; width: var(--control-height); height: var(--control-height); margin-right: 2px; flex: none; border-radius: 50%; background: rgba(255, 255, 255, 0.14); transition: background-color 0.3s, color 0.3s; }
+  .pump[data-phase="running"] .pump__disc { background: rgba(255, 255, 255, 0.26); }
+  .pump[data-phase="faulted"] .pump__disc { background: var(--chip-error-fill); color: var(--chip-error); }
+  .pump__icon { display: none; grid-area: 1 / 1; }
+  .pump[data-phase="running"] [data-icon="running"],
+  .pump[data-phase="waiting"] [data-icon="waiting"],
+  .pump[data-phase="ready"] [data-icon="ready"],
+  .pump[data-phase="disabled"] [data-icon="disabled"],
+  .pump[data-phase="faulted"] [data-icon="faulted"] { display: block; }
+  .pump[data-phase="running"] .pump__icon { animation: pulse 1.6s ease-in-out infinite; }
+  .pump__title { font-size: 14px; font-weight: 500; opacity: 0.85; }
+  .pump__state { font-size: 16px; font-weight: 500; }
+
+  .pump__time { display: flex; align-items: baseline; gap: 6px; font-size: 13px; white-space: nowrap; }
+  .pump__time span { opacity: 0.8; }
+  .pump__time b { font-size: 16px; font-weight: 500; }
+  .pump__time small { margin-left: 1px; font-size: 12px; font-weight: 400; opacity: 0.85; }
+
+  .pump__bar { position: relative; height: 6px; margin: 10px 0 12px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+  .pump__progress { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: rgba(255, 255, 255, 0.6); transition: width 0.45s ease; }
+  .pump[data-phase="running"] .pump__progress { background: #fff; }
+  .pump[data-phase="running"] .pump__progress, .pump[data-due] .pump__progress { animation: pulse 1.6s ease-in-out infinite; }
+  .pump[data-phase="disabled"] .pump__bar, .pump[data-phase="faulted"] .pump__bar { background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px); }
+
+  .pump__foot { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; }
+  .pump__facts { display: flex; flex-wrap: wrap; gap: 6px 24px; font-size: 13px; }
+  .pump__facts div { display: flex; gap: 6px; }
+  .pump__facts dt { opacity: 0.8; }
+  .pump__facts dd { font-weight: 600; }
+  .pump__facts small { margin-left: 1px; font-size: 11px; font-weight: 400; opacity: 0.85; }
+  .pump__request { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  .pump__request svg { flex: none; }
+  .pump__request [data-icon] { display: none; }
+  .pump__request[data-request="run"] [data-icon="run"], .pump__request[data-request="stop"] [data-icon="stop"] { display: block; }
+  .pump__request[data-request="stop"] { background: rgba(255, 255, 255, 0.22); }
+  .pump__request[data-request="stop"]:hover { background: rgba(255, 255, 255, 0.28); }
+  .pump__request:disabled { opacity: 0.5; cursor: default; }
+  .pump__request:disabled:hover { background: rgba(255, 255, 255, 0.1); }
+
+  .section { padding-top: 40px; scroll-margin-top: 16px; }
+  .section__head { display: flex; justify-content: space-between; align-items: end; gap: 12px 24px; flex-wrap: wrap; margin-bottom: 14px; }
+  .section__head .section__title { margin-bottom: 0; }
+  .section__title { margin-bottom: 14px; font-size: 16px; font-weight: 600; }
+  .section__note { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--ink-3); }
+  .stats { display: flex; gap: 24px; }
+  .stats dt { font-size: 12px; color: var(--ink-3); }
+  .stats dd { font-size: 16px; font-weight: 500; }
+  .stats small { margin-left: 1px; font-size: 12px; font-weight: 400; color: var(--ink-3); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .legend__item { display: inline-flex; align-items: center; gap: 8px; }
+  .legend__mark { flex: none; width: 16px; }
+  .legend__mark--trace { height: 3px; border-radius: 2px; background: var(--trace); }
+  .legend__mark--target {
+    height: 2px;
+    background: repeating-linear-gradient(to right, var(--trace) 0 2px, transparent 2px 6px);
+    opacity: 0.6;
+  }
+  .legend__mark--band { height: 12px; border-radius: 3px; background: var(--trace-tint); }
+  .legend__mark--runs { height: 12px; border-radius: 3px; background: var(--run-tint); }
+
+  /* The open part's name is the section's heading, and opens a menu of all the parts. */
+  .details__picker { position: relative; width: fit-content; margin-bottom: 14px; }
+  .details__current {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -4px -8px;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color 0.2s;
+  }
+  .details__current:hover, .details__current[aria-expanded="true"] { background: var(--line); }
+  .details__current:focus-visible { outline: 2px solid var(--trace); outline-offset: 2px; }
+  .details__chevron {
+    width: 8px;
+    height: 8px;
+    margin: 0 2px;
+    border-right: 2px solid var(--ink-3);
+    border-bottom: 2px solid var(--ink-3);
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform 0.2s ease;
+  }
+  .details__current[aria-expanded="true"] .details__chevron { transform: translateY(2px) rotate(225deg); }
+  .details__menu, .polling__menu {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 10px);
+    left: -8px;
+    min-width: 220px;
+    padding: 6px;
+    border-radius: 10px;
+    background: var(--raised);
+    box-shadow: 0 0 0 1px var(--edge), 0 12px 32px rgba(0, 0, 0, 0.14);
+    animation: drop-in 0.15s ease-out;
+  }
+  .details__option, .polling__option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink-2);
+    text-align: left;
+    white-space: nowrap;
+  }
+  /* The pointer moves focus too, which leaves only one entry ever lit. */
+  .details__option:focus, .polling__option:focus { outline: none; background: var(--line); color: var(--ink); }
+  .details__option[aria-checked="true"], .polling__option[aria-checked="true"] { color: var(--ink); font-weight: 500; }
+  .details__option[aria-checked="true"]::after, .polling__option[aria-checked="true"]::after {
+    content: "";
+    width: 5px;
+    height: 9px;
+    margin: -3px 3px 0 auto;
+    border: solid var(--trace);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .details__count { padding: 1px 7px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--edge); color: var(--ink-2); font-size: 12px; font-weight: 500; }
+  .details__count[data-tone="error"] { box-shadow: none; background: var(--state-error-tint); color: var(--state-error-ink); }
+  .details__count[data-tone="warning"] { box-shadow: none; background: var(--state-warning-tint); color: var(--state-warning-ink); }
+  .details__panel { animation: drop-in 0.2s ease-out; }
+  @keyframes drop-in { from { opacity: 0; transform: translateY(-4px); } }
+
+  .rows { column-count: 2; column-gap: 48px; }
+  .rows--single { columns: auto; }
+  .rows__row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 11px 0; border-top: 1px solid var(--line); break-inside: avoid; }
+  .rows__row--next-column { break-before: column; }
+  .rows__row dt { flex: none; color: var(--ink-2); }
+  .rows__row dd { font-weight: 500; text-align: right; white-space: nowrap; }
+  .rows__row small, .memory__free small { margin-left: 1px; font-size: 12px; font-weight: 400; color: var(--ink-3); }
+  /* No multi-column box at all, where a forced column break would open a column off to the side */
+  @media (max-width: 767.98px) {
+    .rows { columns: auto; }
+  }
+
+  .memory__heap + .memory__heap { margin-top: 24px; }
+  .memory__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 16px; }
+  .memory__name { font-weight: 500; }
+  .memory__free { color: var(--ink-2); }
+  .memory__bar { position: relative; height: 8px; margin: 10px 0 14px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 8%, transparent); overflow: hidden; }
+  .memory__fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--trace); }
+  .memory .rows__row dd { min-width: 0; white-space: normal; }
+  .memory__amount { font-weight: 500; color: var(--ink); white-space: nowrap; }
+  .memory__exact { font-weight: 400; color: var(--ink-2); white-space: nowrap; }
+
+  .faults { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 48px; align-items: start; }
+  .faults__title { margin-bottom: 8px; font-size: 12px; font-weight: 500; color: var(--ink-2); }
+  .faults__none, .details__empty { padding: 11px 0; border-top: 1px solid var(--line); color: var(--ink-3); }
+  .fault .fault__code { display: flex; align-items: center; gap: 10px; font-weight: 500; color: var(--ink); }
+  .fault__code::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); opacity: 0.8; }
+  .fault__severity { padding: 1px 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--edge); color: var(--ink-2); font-size: 12px; }
+  .fault[data-severity="error"] .fault__code::before { background: var(--state-error-ink); }
+  .fault[data-severity="warning"] .fault__code::before { background: var(--state-warning-ink); }
+  .fault[data-severity="error"] .fault__severity { box-shadow: none; background: var(--state-error-tint); color: var(--state-error-ink); }
+  .fault[data-severity="warning"] .fault__severity { box-shadow: none; background: var(--state-warning-tint); color: var(--state-warning-ink); }
+  .fault[data-active="false"] .fault__code { font-weight: 400; color: var(--ink-2); }
+  .fault[data-active="false"] .fault__code::before, .fault[data-active="false"] .fault__severity { opacity: 0.7; }
+  @media (max-width: 575.98px) {
+    .faults { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .settings { display: grid; gap: 24px; }
+  .settings__group { display: grid; gap: 16px; min-width: 0; margin: 0; padding: 0; border: 0; }
+  .settings__legend { margin-bottom: 12px; padding: 0; font-size: 14px; font-weight: 500; color: var(--ink); }
+  .setting {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .setting__label { font-size: 14px; color: var(--ink-2); }
+  .setting__box {
+    display: flex;
+    align-items: center;
+    height: var(--field-height);
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid var(--edge);
+  }
+  :where(.setting[data-edited]) .setting__box { border-color: color-mix(in srgb, var(--trace) 55%, var(--edge)); }
+  .setting__box:focus-within { border-color: var(--trace); box-shadow: inset 0 0 0 1px var(--trace); }
+  .setting__box:has(:invalid) { border-color: var(--state-error-ink); }
+  .setting__value {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+  }
+  .setting__input {
+    flex: 0 1 auto;
+    width: 3.5ch;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 500;
+    text-align: right;
+    outline: none;
+    appearance: textfield;
+  }
+  .setting__input::-webkit-inner-spin-button, .setting__input::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+  .setting__sign { color: var(--ink-3); font-size: 12px; }
+  .setting__unit { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+  .setting__step {
+    flex: none;
+    width: 32px;
+    height: 100%;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--ink-3);
+    font-size: 16px;
+    line-height: 1;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .setting__step:hover { color: var(--trace); }
+  .setting__step:active { background: var(--trace-tint); }
+  .setting__choice {
+    position: relative;
+    flex: 1;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    border-radius: 7px;
+    color: var(--ink-3);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .setting__choice:hover { color: var(--trace); }
+  .setting__choice:has(:checked) { background: var(--trace-tint); color: var(--ink); }
+  .setting__choice input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: var(--state-error-tint);
+    color: var(--state-error-ink);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .alert:empty { display: none; }
+  .alert::before { content: "!"; flex: none; display: grid; place-items: center; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%; background: var(--state-error-ink); color: var(--bg); font-size: 10px; font-weight: 700; line-height: 1; }
+  .alert[data-tone="busy"] { background: var(--state-none-tint); color: var(--ink-2); }
+  .alert[data-tone="busy"]::before { content: ""; color: inherit; background: none; border: 2px solid color-mix(in srgb, currentColor 25%, transparent); border-top-color: currentColor; animation: spin 0.8s linear infinite; }
+  .alert[data-tone="ok"] { background: var(--state-ok-tint); color: var(--state-ok-ink); }
+  .alert[data-tone="ok"]::before { content: ""; color: inherit; width: 5px; height: 9px; margin: 6px 3px 0 4px; border-radius: 0; background: none; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .actions { position: sticky; bottom: 0; display: flex; margin-top: 8px; padding: 16px 0 24px; background: var(--bg); }
+  .save {
+    height: var(--field-height);
+    padding: 0 24px;
+    border-radius: 8px;
+    border: 0;
+    background: var(--state-fill);
+    color: #fff;
+    font-weight: 600;
+  }
+  .save:not(:disabled):hover { background: color-mix(in srgb, var(--state-fill) 88%, #000); }
+  .save:disabled {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--edge);
+    color: var(--ink-3);
+    cursor: default;
+  }
+
+  .dialog {
+    width: min(360px, 100vw);
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0 0 0 auto;
+    padding: 0;
+    border: 0;
+    border-radius: 10px 0 0 10px;
+    background: var(--bg);
+    color: var(--ink);
+    box-shadow: -24px 0 64px rgba(0, 0, 0, 0.2);
+  }
+  .dialog[open] { animation: panel-in 0.25s ease-out; }
+  .dialog[open]::backdrop { animation: dim-in 0.25s ease-out; }
+  .dialog[data-closing][open], .dialog[data-closing][open]::backdrop { animation: panel-out 0.2s ease-in forwards; }
+  .dialog[data-closing][open]::backdrop { animation-name: dim-out; }
+  @keyframes panel-in { from { transform: translateX(100%); } }
+  @keyframes panel-out { to { transform: translateX(100%); } }
+  @keyframes dim-in { from { opacity: 0; } }
+  @keyframes dim-out { to { opacity: 0; } }
+  .dialog:focus { outline: none; }
+  .dialog::backdrop { background: rgba(20, 18, 15, 0.45); }
+  .dialog__body { padding: 24px 24px 0; }
+  .dialog__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .dialog__title { font-size: 20px; font-weight: 500; letter-spacing: -0.01em; }
+  .dialog__close {
+    width: var(--control-height);
+    height: var(--control-height);
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--ink-3);
+  }
+  .dialog__close:hover { background: var(--line); color: var(--ink); }
+  .dialog button:focus-visible { outline: 2px solid var(--trace); outline-offset: 2px; }
+
+  .frame summary { display: flex; justify-content: space-between; align-items: center; }
+  .frame__title { margin: 0; }
+  .frame__toggle {
+    width: 10px;
+    height: 10px;
+    margin-right: 4px;
+    border-right: 2px solid var(--ink-3);
+    border-bottom: 2px solid var(--ink-3);
+    transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform 0.2s ease;
+  }
+  .frame[open] .frame__toggle { transform: rotate(225deg) translate(-2px, -2px); }
+  .frame pre {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    color: var(--ink-2);
+  }
+
+  .footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    padding-bottom: 32px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  .polling { position: relative; display: inline-block; }
+  .polling__current {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: -2px 0 -2px -2px;
+    padding: 2px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink-2);
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+  .polling__current:hover, .polling__current[aria-expanded="true"] { background: var(--line); }
+  /* Inset, because an outline would run over the word before it */
+  .polling__current:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--trace); }
+  .polling__chevron {
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid var(--ink-3);
+    border-bottom: 1.5px solid var(--ink-3);
+    transform: translateY(-1px) rotate(45deg);
+    transition: transform 0.2s ease;
+  }
+  .polling__current[aria-expanded="true"] .polling__chevron { transform: translateY(1px) rotate(225deg); }
+  .polling__menu {
+    top: auto;
+    bottom: calc(100% + 8px);
+    left: -2px;
+    min-width: 120px;
+    font-size: 14px;
+    animation-name: rise-in;
+  }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(4px); } }
+
+  @media (pointer: coarse) {
+    :root { --control-height: 36px; --field-height: 44px; }
+    .button, .dialog__close, .polling__current { position: relative; }
+    .button::before, .dialog__close::before { content: ""; position: absolute; inset: -4px; }
+    .polling__current::before { content: ""; position: absolute; inset: -10px -4px; }
+    .setting__step { width: 44px; }
+    /* iOS zooms into a field whose text is below 16px. */
+    .setting__input { font-size: 16px; }
+  }
+</style>
+<script>
+  // Applied before the page paints, because a stored dark choice must never flash light.
+  try {
+    const stored = localStorage.getItem("theme");
+    if (stored === "light" || stored === "dark") {
+      document.documentElement.dataset.theme = stored;
+    }
+  } catch (error) {
+    // Storage may be blocked, leaving the OS preference in charge.
+  }
+</script>
+</head>
+<body>
+
+<div id="panel" data-connection="connecting">
+  <div class="state" id="state">
+    <div class="container">
+      <header class="header">
+        <div class="brand">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5s-6.5 7.2-6.5 12a6.5 6.5 0 0 0 13 0c0-4.8-6.5-12-6.5-12z"/></svg>
+          <h1 class="brand__title">Plant watering</h1>
+        </div>
+        <div class="tools">
+          <span class="chip chip--connection" id="connection" data-tone="none" role="status" title="Connection: connecting"><span class="dot"></span><span class="chip__label" id="connectionText">connecting</span></span>
+          <a class="chip" href="#faults" data-severity="error" data-tone="error" title="0 active errors" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.5h.01"/></svg><span id="errorCount">0</span><span class="visually-hidden">errors</span></a>
+          <a class="chip" href="#faults" data-severity="warning" data-tone="warning" title="0 active warnings" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 2.6 20h18.8zM12 10v4M12 17h.01"/></svg><span id="warningCount">0</span><span class="visually-hidden">warnings</span></a>
+          <a class="chip chip--network" id="network" href="#device" data-tone="none" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9.5" y="3" width="5" height="5" rx="1.2"/><rect x="3" y="16" width="5" height="5" rx="1.2"/><rect x="16" y="16" width="5" height="5" rx="1.2"/><path d="M12 8v4M5.5 16v-4h13v4"/></svg><span class="visually-hidden" id="networkText"></span></a>
+          <button class="button button--icon" id="openSettings" type="button" aria-haspopup="dialog" aria-label="Settings" title="Settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg></button>
+          <button class="button button--icon button--theme" id="theme" data-choice="system" type="button" title="Theme: system"><svg class="button__icon" data-icon="system" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg><svg class="button__icon" data-icon="light" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="button__icon" data-icon="dark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></svg><span class="visually-hidden" id="themeText">Theme: system</span></button>
+          <button class="button" id="logout" type="button">Log out</button>
+        </div>
+      </header>
+
+      <section class="soil" aria-label="Soil moisture">
+        <div class="soil__head">
+          <h2 class="soil__title">Soil moisture</h2>
+          <span class="chip chip--state" id="sensorChip" data-tone="none"><span class="dot"></span><span id="verdict">&mdash;</span></span>
+        </div>
+        <p class="soil__value"><span id="smoothedWhole">--</span><small id="smoothedDecimals">.--</small><small>%</small></p>
+        <div class="soil__facts">
+          <p class="trend" id="trend" data-direction="none" title="Change of the smoothed reading over the last minute"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span id="trendText"><b>--</b><small>%</small><span class="trend__unit"> per minute</span></span></p>
+          <dl class="soil__figures">
+            <div><dt>Target</dt><dd><span id="target">--</span><small>%</small></dd></div>
+            <div><dt>Tolerance band</dt><dd><span id="tolerance">--</span><small>%</small></dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="pump" id="pumpDock" data-phase="none" aria-label="Pump">
+        <div class="container pump__inner">
+          <div class="pump__top">
+            <div class="pump__lead">
+              <span class="pump__disc" aria-hidden="true"><svg class="pump__icon" data-icon="running" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s-5.5 6.1-5.5 10.2a5.5 5.5 0 0 0 11 0C17.5 9.1 12 3 12 3z"/></svg><svg class="pump__icon" data-icon="waiting" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12M6 21h12M7 3v3.5l5 5.5 5-5.5V3M7 21v-3.5l5-5.5 5 5.5V21"/></svg><svg class="pump__icon" data-icon="ready" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><svg class="pump__icon" data-icon="disabled" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5v14M15 5v14"/></svg><svg class="pump__icon" data-icon="faulted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 2.6 20h18.8zM12 10v4M12 17h.01"/></svg></span>
+              <h2 class="pump__title">Pump</h2>
+              <p class="pump__state" id="pumpState">&mdash;</p>
+            </div>
+            <p class="pump__time"><span id="pumpTimeTitle">&nbsp;</span><b id="pumpTime">--<small>s</small></b></p>
+          </div>
+          <div class="pump__bar" aria-hidden="true"><i class="pump__progress" id="pumpProgress"></i></div>
+          <div class="pump__foot">
+            <dl class="pump__facts">
+              <div><dt>Run length</dt><dd id="duration">--<small>s</small></dd></div>
+              <div><dt>Wait between runs</dt><dd id="waitTime">--<small>s</small></dd></div>
+            </dl>
+            <button class="button pump__request" id="pumpRequest" type="button" data-request="run" disabled><svg data-icon="run" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s-5.5 6.1-5.5 10.2a5.5 5.5 0 0 0 11 0C17.5 9.1 12 3 12 3z"/></svg><svg data-icon="stop" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/></svg><span id="pumpRequestText">Water now</span></button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <main class="container">
+    <section class="section" aria-label="Soil moisture history">
+      <div class="section__head">
+        <h2 class="section__title">Soil moisture history<span class="section__note" id="historyNote">last 5 minutes</span></h2>
+        <dl class="stats">
+          <div><dt>Lowest</dt><dd><span id="statLow">--</span><small>%</small></dd></div>
+          <div><dt>Highest</dt><dd><span id="statHigh">--</span><small>%</small></dd></div>
+          <div><dt>Pump ran</dt><dd id="statPump">--<small>s</small></dd></div>
+        </dl>
+      </div>
+      <div class="chart"><canvas id="chart" role="img" aria-label="Smoothed reading over the last 5 minutes"></canvas><div class="chart__tip" id="chartTip" hidden></div></div>
+      <div class="legend">
+        <span class="legend__item"><i class="legend__mark legend__mark--trace"></i>smoothed reading</span>
+        <span class="legend__item"><i class="legend__mark legend__mark--target"></i>target</span>
+        <span class="legend__item"><i class="legend__mark legend__mark--band"></i>tolerance band</span>
+        <span class="legend__item"><i class="legend__mark legend__mark--runs"></i>pump running</span>
+      </div>
+    </section>
+
+    <section class="section details" id="details" aria-labelledby="detailsTitle">
+      <h2 class="visually-hidden" id="detailsTitle">Details</h2>
+      <div class="details__picker">
+        <h3><button class="details__current" id="detailsCurrent" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="detailsMenu"><span id="detailsCurrentName"></span><span class="details__count" id="detailsCurrentCount" hidden></span><span class="details__chevron" aria-hidden="true"></span></button></h3>
+        <div class="details__menu" id="detailsMenu" role="menu" aria-labelledby="detailsTitle" hidden>
+          <button class="details__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-part="soil">Soil moisture</button>
+          <button class="details__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-part="pump">Pump</button>
+          <button class="details__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-part="device">Device</button>
+          <button class="details__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-part="memory">Memory</button>
+          <button class="details__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-part="faults">Faults <span class="details__count" id="faultCount" hidden></span></button>
+        </div>
+      </div>
+      <div class="details__panel" id="soil" hidden></div>
+      <div class="details__panel" id="pump" hidden></div>
+      <div class="details__panel" id="device" hidden></div>
+      <div class="details__panel" id="memory" hidden></div>
+      <div class="details__panel" id="faults" hidden></div>
+    </section>
+
+    <section class="section" aria-label="Last frame">
+      <details class="frame">
+        <summary><h2 class="section__title frame__title">Last frame</h2><span class="frame__toggle" aria-hidden="true"></span></summary>
+        <pre id="json">{}</pre>
+      </details>
+    </section>
+
+    <footer class="footer">
+      <span id="pollingLabel">GET /api/telemetry · polling every</span>
+      <span class="polling">
+        <button class="polling__current" id="pollingCurrent" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="pollingMenu" aria-describedby="pollingLabel"><span id="pollingCurrentName"></span><span class="polling__chevron" aria-hidden="true"></span></button>
+        <span class="polling__menu" id="pollingMenu" role="menu" aria-label="Polling interval" hidden>
+          <button class="polling__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-ms="1000">1s</button>
+          <button class="polling__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-ms="5000">5s</button>
+          <button class="polling__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-ms="10000">10s</button>
+          <button class="polling__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-ms="30000">30s</button>
+          <button class="polling__option" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-ms="60000">1m</button>
+        </span>
+      </span>
+    </footer>
+  </main>
+
+  <dialog class="dialog" id="settingsDialog" aria-labelledby="settingsTitle" autofocus>
+    <form class="dialog__body" id="form" novalidate>
+      <div class="dialog__head">
+        <h2 class="dialog__title" id="settingsTitle">Settings</h2>
+        <button class="dialog__close" id="closeSettings" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="settings">
+        <fieldset class="settings__group">
+          <legend class="settings__legend">Soil moisture</legend>
+          <div class="setting">
+            <label class="setting__label" for="setTarget">Target</label>
+            <span class="setting__box">
+              <button class="setting__step" type="button" data-step="-0.5" aria-label="Lower moisture target">&minus;</button>
+              <span class="setting__value">
+                <input class="setting__input" id="setTarget" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+                <span class="setting__unit">%</span>
+              </span>
+              <button class="setting__step" type="button" data-step="0.5" aria-label="Raise moisture target">+</button>
+            </span>
+          </div>
+          <div class="setting">
+            <label class="setting__label" for="setTolerance">Tolerance band</label>
+            <span class="setting__box">
+              <button class="setting__step" type="button" data-step="-0.5" aria-label="Lower tolerance band">&minus;</button>
+              <span class="setting__value">
+                <span class="setting__sign">&plusmn;</span>
+                <input class="setting__input" id="setTolerance" type="number" min="0" max="100" step="0.1" inputmode="decimal">
+                <span class="setting__unit">%</span>
+              </span>
+              <button class="setting__step" type="button" data-step="0.5" aria-label="Raise tolerance band">+</button>
+            </span>
+          </div>
+        </fieldset>
+        <fieldset class="settings__group">
+          <legend class="settings__legend">Pump</legend>
+          <div class="setting">
+            <span class="setting__label" id="autoLabel">Automatic watering</span>
+            <span class="setting__box" role="radiogroup" aria-labelledby="autoLabel">
+              <label class="setting__choice"><input id="setAutomaticOff" type="radio" name="automatic">Disabled</label>
+              <label class="setting__choice"><input id="setAutomatic" type="radio" name="automatic">Enabled</label>
+            </span>
+          </div>
+          <div class="setting">
+            <label class="setting__label" for="setDuration">Run length</label>
+            <span class="setting__box">
+              <button class="setting__step" type="button" data-step="-1" aria-label="Lower run length">&minus;</button>
+              <span class="setting__value">
+                <input class="setting__input" id="setDuration" type="number" min="1" max="300" step="1" inputmode="numeric">
+                <span class="setting__unit">s</span>
+              </span>
+              <button class="setting__step" type="button" data-step="1" aria-label="Raise run length">+</button>
+            </span>
+          </div>
+          <div class="setting">
+            <label class="setting__label" for="setWaitTime">Wait between runs</label>
+            <span class="setting__box">
+              <button class="setting__step" type="button" data-step="-10" aria-label="Lower wait between runs">&minus;</button>
+              <span class="setting__value">
+                <input class="setting__input" id="setWaitTime" type="number" min="0" max="86400" step="1" inputmode="numeric">
+                <span class="setting__unit">s</span>
+              </span>
+              <button class="setting__step" type="button" data-step="10" aria-label="Raise wait between runs">+</button>
+            </span>
+          </div>
+        </fieldset>
+        <fieldset class="settings__group">
+          <legend class="settings__legend">Sensor calibration</legend>
+          <div class="setting">
+            <label class="setting__label" for="setAdcMin">Wet point (100%)</label>
+            <span class="setting__box">
+              <button class="setting__step" type="button" data-step="-1" aria-label="Lower wet point">&minus;</button>
+              <span class="setting__value">
+                <input class="setting__input" id="setAdcMin" type="number" min="0" max="4095" step="1" inputmode="numeric">
+              </span>
+              <button class="setting__step" type="button" data-step="1" aria-label="Raise wet point">+</button>
+            </span>
+          </div>
+          <div class="setting">
+            <label class="setting__label" for="setAdcMax">Dry point (0%)</label>
+            <span class="setting__box">
+              <button class="setting__step" type="button" data-step="-1" aria-label="Lower dry point">&minus;</button>
+              <span class="setting__value">
+                <input class="setting__input" id="setAdcMax" type="number" min="0" max="4095" step="1" inputmode="numeric">
+              </span>
+              <button class="setting__step" type="button" data-step="1" aria-label="Raise dry point">+</button>
+            </span>
+          </div>
+        </fieldset>
+      </div>
+      <p class="alert" id="toleranceAlert" role="alert" hidden>The moisture target &plusmn; tolerance band must stay within 0%&ndash;100%</p>
+      <p class="alert" id="calibrationAlert" role="alert" hidden>The wet and dry points cannot be equal or swapped</p>
+      <p class="alert" id="saveStatus" role="status"></p>
+      <div class="actions">
+        <button class="save" id="save" type="submit" disabled>Save</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+
+<script>
+  (function () {
+    "use strict";
+
+    const POLL_INTERVALS_MS = [1000, 5000, 10000, 30000, 60000];
+    const POLL_KEY = "pollInterval";
+    const HISTORY = 300;
+    const AXIS_STEPS = 5;
+    const TREND_S = 60;
+    const THEME_KEY = "theme";
+    const THEMES = ["system", "light", "dark"];
+    const PART_KEY = "detailsPart";
+    const PARTS = ["soil", "pump", "device", "memory", "faults"];
+    const SEVERITIES = { E: "error", W: "warning" };
+    const ORDER = ["error", "warning", "unknown"];
+
+    const SETTINGS = [
+      { input: "setTarget", group: "sensor", field: "target", decimals: 1 },
+      { input: "setTolerance", group: "sensor", field: "deadband", decimals: 1 },
+      { input: "setDuration", group: "pump", field: "duration", decimals: 0 },
+      { input: "setWaitTime", group: "pump", field: "waitTime", decimals: 0 },
+      { input: "setAutomatic", group: "pump", field: "automatic", toggle: "setAutomaticOff" },
+      { input: "setAdcMin", group: "calibration", field: "adcMin", decimals: 0 },
+      { input: "setAdcMax", group: "calibration", field: "adcMax", decimals: 0 }
+    ];
+    const PAIRED = ["sensor", "calibration"];
+    // Where each group sits in the frame and in a command
+    const PATHS = { sensor: ["sensor"], pump: ["pump"], calibration: ["sensor", "calibration"] };
+
+    const IDS = [
+      "smoothedWhole",
+      "smoothedDecimals",
+      "trend",
+      "trendText",
+      "statLow",
+      "statHigh",
+      "statPump",
+      "target",
+      "tolerance",
+      "sensorChip",
+      "verdict",
+      "pumpDock",
+      "pumpState",
+      "pumpTimeTitle",
+      "pumpTime",
+      "pumpProgress",
+      "duration",
+      "waitTime",
+      "pumpRequest",
+      "pumpRequestText",
+      "errorCount",
+      "warningCount",
+      "details",
+      "detailsCurrent",
+      "detailsCurrentName",
+      "detailsCurrentCount",
+      "detailsMenu",
+      "faultCount",
+      "network",
+      "networkText",
+      "form",
+      "settingsDialog",
+      "openSettings",
+      "closeSettings",
+      "setTarget",
+      "setTolerance",
+      "setDuration",
+      "setWaitTime",
+      "setAutomatic",
+      "setAutomaticOff",
+      "setAdcMin",
+      "setAdcMax",
+      "toleranceAlert",
+      "calibrationAlert",
+      "save",
+      "saveStatus",
+      "json",
+      "connection",
+      "connectionText",
+      "pollingCurrent",
+      "pollingCurrentName",
+      "pollingMenu",
+      "historyNote",
+      "theme",
+      "themeText",
+      "logout",
+      "panel",
+      "state",
+      "chart",
+      "chartTip"
+    ];
+
+    const el = {};
+    IDS.forEach((id) => {
+      el[id] = document.getElementById(id);
+    });
+
+    const canvas = el.chart;
+    const ctx = canvas.getContext("2d");
+    // One point per poll that brought a reading: the smoothed value, or null
+    // where it was not usable, and whether the pump ran
+    const history = [];
+
+    let live = null;
+    // One poll at a time, because a slow answer must never land after a newer one
+    let polling = false;
+    let pollMs = POLL_INTERVALS_MS[0];
+    let pollTimer = null;
+    // What each input was last filled with. An edit and a device-side change
+    // both show as a difference from it.
+    const seeded = {};
+    let theme = "system";
+    // How many polls back the pointer rests on the chart, or null when it is off it
+    let hoverAge = null;
+
+    function historyMinutes() {
+      return (HISTORY * pollMs) / 60000;
+    }
+
+    function historySpan(minutes) {
+      const [count, unit] = minutes < 60 ? [minutes, "minute"] : [minutes / 60, "hour"];
+      return "last " + count + " " + unit + (count === 1 ? "" : "s");
+    }
+
+    function axisLabel(minutes) {
+      if (minutes < 60) {
+        return minutes + "m";
+      }
+      const rest = minutes % 60;
+      return Math.floor(minutes / 60) + "h" + (rest > 0 ? " " + rest + "m" : "");
+    }
+
+    function duration(seconds) {
+      const total = Math.max(0, Math.round(seconds));
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const parts = [];
+
+      if (days > 0) {
+        parts.push(days + "d");
+      }
+      if (parts.length > 0 || hours > 0) {
+        parts.push(hours + "h");
+      }
+      if (parts.length > 0 || minutes > 0) {
+        parts.push(minutes + "m");
+      }
+      parts.push((total % 60) + "s");
+
+      return parts.join(" ");
+    }
+
+    function make(tag, className, ...children) {
+      const made = document.createElement(tag);
+      if (className) {
+        made.className = className;
+      }
+      made.append(...children);
+      return made;
+    }
+
+    function small(text) {
+      return make("small", "", text);
+    }
+
+    function timeParts(seconds) {
+      const parts = [];
+      duration(seconds).split(" ").forEach((part, index) => {
+        parts.push((index > 0 ? " " : "") + part.slice(0, -1), small(part.slice(-1)));
+      });
+      return parts;
+    }
+
+    function noTime() {
+      return ["--", small("s")];
+    }
+
+    function percentParts(value, decimals) {
+      return [value.toFixed(decimals), small("%")];
+    }
+
+    function showDuration(node, seconds) {
+      node.replaceChildren(...timeParts(seconds));
+    }
+
+    function showNoDuration(node) {
+      node.replaceChildren(...noTime());
+    }
+
+    // A run starts below the low edge and stops at the high one.
+    function toleranceEdges(sensor) {
+      return { low: sensor.target - sensor.deadband, high: sensor.target + sensor.deadband };
+    }
+
+    // ---- chart ----
+
+    function drawChart(sensor) {
+      const style = getComputedStyle(document.documentElement);
+      const trace = style.getPropertyValue("--trace").trim();
+      const ink3 = style.getPropertyValue("--ink-3").trim();
+      const line = style.getPropertyValue("--line").trim();
+      const paper = style.getPropertyValue("--bg").trim();
+      const traceTint = style.getPropertyValue("--trace-tint").trim();
+      const runTint = style.getPropertyValue("--run-tint").trim();
+      const ratio = window.devicePixelRatio || 1;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      el.chartTip.hidden = true;
+
+      const edges = toleranceEdges(sensor);
+      const readings = history
+        .filter((point) => point.smoothed !== null)
+        .map((point) => point.smoothed)
+        .concat([edges.low, edges.high]);
+      let bottom = Math.min(...readings);
+      let top = Math.max(...readings);
+
+      // Never zoom in past a few percent, or noise reads as weather
+      const minSpan = 4;
+      if (top - bottom < minSpan) {
+        const middle = (top + bottom) / 2;
+        bottom = middle - minSpan / 2;
+        top = middle + minSpan / 2;
+      }
+      const margin = (top - bottom) * 0.15;
+      bottom = Math.max(0, bottom - margin);
+      top = Math.min(100, top + margin);
+
+      const axisWidth = 40;
+      const plotWidth = width - axisWidth;
+      const plotTop = 8;
+      const plotBottom = height - 24;
+      const slotWidth = plotWidth / HISTORY;
+      const yAt = (percent) => plotTop + (1 - (percent - bottom) / (top - bottom)) * (plotBottom - plotTop);
+      const xAt = (slot) => (slot / (HISTORY - 1)) * plotWidth;
+      const firstSlot = HISTORY - history.length;
+      const font = getComputedStyle(document.body).fontFamily;
+
+      ctx.fillStyle = runTint;
+      let runStart = -1;
+      history.forEach((point, index) => {
+        const last = index === history.length - 1;
+        if (point.on && runStart < 0) {
+          runStart = index;
+        }
+        if (runStart >= 0 && (!point.on || last)) {
+          const end = point.on ? index : index - 1;
+          // A second of run is a pixel or less on a phone, too thin to see.
+          const from = xAt(firstSlot + runStart) - slotWidth / 2;
+          const to = xAt(firstSlot + end) + slotWidth / 2;
+          const widen = Math.max(0, 4 - (to - from)) / 2;
+          const left = Math.max(0, from - widen);
+          const right = Math.min(plotWidth, to + widen);
+          ctx.fillRect(left, plotTop, right - left, plotBottom - plotTop);
+          runStart = -1;
+        }
+      });
+
+      ctx.fillStyle = traceTint;
+      ctx.fillRect(0, yAt(edges.high), plotWidth, yAt(edges.low) - yAt(edges.high));
+
+      // Steps at most double, which lets the finest within eight lines still
+      // leave four or more on any range.
+      ctx.font = "12px " + font;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "right";
+      ctx.fillStyle = ink3;
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 1;
+      const gridStep = [1, 2, 4, 5, 10, 20].find((step) => (top - bottom) / step <= 8) || 25;
+      const firstLine = Math.ceil(bottom / gridStep);
+      for (let index = firstLine; index * gridStep <= top; index += 1) {
+        const percent = index * gridStep;
+        const y = Math.round(yAt(percent)) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(plotWidth, y);
+        ctx.stroke();
+        ctx.fillText(percent + "%", width, y);
+      }
+
+      ctx.strokeStyle = trace;
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, Math.round(yAt(sensor.target)));
+      ctx.lineTo(plotWidth, Math.round(yAt(sensor.target)));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+
+      const slotsPerMinute = 60000 / pollMs;
+      const spanMinutes = historyMinutes();
+      const step = spanMinutes / AXIS_STEPS;
+      ctx.fillStyle = ink3;
+      ctx.textBaseline = "alphabetic";
+      ctx.textAlign = "left";
+      ctx.fillText(axisLabel(spanMinutes), 0, height - 2);
+      ctx.textAlign = "center";
+      for (let minute = step; minute < spanMinutes; minute += step) {
+        ctx.fillText(axisLabel(minute), xAt(HISTORY - 1 - (minute * slotsPerMinute)), height - 2);
+      }
+      ctx.textAlign = "right";
+      ctx.fillText("now", plotWidth, height - 2);
+      ctx.textAlign = "left";
+
+      if (history.length === 0) {
+        return;
+      }
+
+      const stretches = [];
+      let current = [];
+      history.forEach((point, index) => {
+        if (point.smoothed === null) {
+          if (current.length > 0) {
+            stretches.push(current);
+          }
+          current = [];
+          return;
+        }
+        current.push([xAt(firstSlot + index), yAt(point.smoothed)]);
+      });
+      if (current.length > 0) {
+        stretches.push(current);
+      }
+
+      // The canvas spells an opaque color as #rrggbb, which takes an alpha pair.
+      ctx.fillStyle = trace;
+      const solid = ctx.fillStyle;
+      stretches.forEach((stretch) => {
+        if (stretch.length < 2) {
+          return;
+        }
+        if (solid.startsWith("#")) {
+          const fade = ctx.createLinearGradient(0, plotTop, 0, plotBottom);
+          fade.addColorStop(0, solid + "3d");
+          fade.addColorStop(1, solid + "00");
+          ctx.beginPath();
+          ctx.moveTo(stretch[0][0], plotBottom);
+          stretch.forEach((point) => ctx.lineTo(point[0], point[1]));
+          ctx.lineTo(stretch[stretch.length - 1][0], plotBottom);
+          ctx.closePath();
+          ctx.fillStyle = fade;
+          ctx.fill();
+        }
+        ctx.beginPath();
+        ctx.moveTo(stretch[0][0], stretch[0][1]);
+        stretch.slice(1).forEach((point) => ctx.lineTo(point[0], point[1]));
+        ctx.strokeStyle = trace;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.stroke();
+      });
+
+      const newest = history[history.length - 1];
+      if (newest.smoothed !== null) {
+        ctx.beginPath();
+        ctx.arc(xAt(HISTORY - 1), yAt(newest.smoothed), 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = trace;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = paper;
+        ctx.stroke();
+      }
+
+      if (hoverAge === null || hoverAge >= history.length) {
+        return;
+      }
+      const hovered = history[history.length - 1 - hoverAge];
+      const x = Math.round(xAt(HISTORY - 1 - hoverAge)) + 0.5;
+      ctx.strokeStyle = ink3;
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, plotTop);
+      ctx.lineTo(x, plotBottom);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (hovered.smoothed !== null) {
+        ctx.beginPath();
+        ctx.arc(x, yAt(hovered.smoothed), 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = trace;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = paper;
+        ctx.stroke();
+      }
+
+      const value = document.createElement("strong");
+      value.textContent = hovered.smoothed === null ? "no reading" : hovered.smoothed.toFixed(2) + "%";
+      const when = hoverAge === 0 ? "now" : duration(history[history.length - 1].uptime - hovered.uptime) + " ago";
+      el.chartTip.replaceChildren(value, when + (hovered.on ? " · pump running" : ""));
+      el.chartTip.hidden = false;
+      const tipWidth = el.chartTip.offsetWidth;
+      const tipHeight = el.chartTip.offsetHeight;
+      const anchor = hovered.smoothed === null ? plotTop + tipHeight + 12 : yAt(hovered.smoothed);
+      el.chartTip.style.left = Math.min(Math.max(0, x - tipWidth / 2), plotWidth - tipWidth) + "px";
+      el.chartTip.style.top = (anchor - tipHeight - 12 < 0 ? anchor + 12 : anchor - tipHeight - 12) + "px";
+    }
+
+    function clearHover() {
+      if (hoverAge !== null) {
+        hoverAge = null;
+        redraw();
+      }
+    }
+
+    function hoverChart(event) {
+      const box = canvas.getBoundingClientRect();
+      const plotWidth = box.width - 40;
+      const slot = Math.round(((event.clientX - box.left) / plotWidth) * (HISTORY - 1));
+      const age = HISTORY - 1 - Math.min(HISTORY - 1, Math.max(0, slot));
+      hoverAge = age < history.length ? age : null;
+      redraw();
+    }
+
+    function redraw() {
+      if (live !== null) {
+        drawChart(live.sensor);
+      }
+    }
+
+    // ---- polling interval ----
+
+    function readPollInterval() {
+      try {
+        const stored = Number(localStorage.getItem(POLL_KEY));
+        return POLL_INTERVALS_MS.includes(stored) ? stored : POLL_INTERVALS_MS[0];
+      } catch (error) {
+        return POLL_INTERVALS_MS[0];
+      }
+    }
+
+    function writePollInterval(ms) {
+      try {
+        localStorage.setItem(POLL_KEY, String(ms));
+      } catch (error) {
+        // An interval that cannot be remembered still holds on this page.
+      }
+    }
+
+    function pollingOptions() {
+      return Array.from(el.pollingMenu.querySelectorAll('[role="menuitemradio"]'));
+    }
+
+    function selectPollInterval(ms) {
+      pollMs = ms;
+      pollingOptions().forEach((option) => {
+        const selected = Number(option.dataset.ms) === ms;
+        option.setAttribute("aria-checked", selected);
+        if (selected) {
+          el.pollingCurrentName.textContent = option.textContent;
+        }
+      });
+      const span = historySpan(historyMinutes());
+      el.historyNote.textContent = span;
+      canvas.setAttribute("aria-label", "Smoothed reading over the " + span);
+      writePollInterval(ms);
+      clearInterval(pollTimer);
+      pollTimer = setInterval(poll, ms);
+    }
+
+    function openPollingMenu() {
+      el.pollingMenu.hidden = false;
+      el.pollingCurrent.setAttribute("aria-expanded", "true");
+      el.pollingMenu.querySelector('[aria-checked="true"]').focus();
+    }
+
+    function closePollingMenu(refocus) {
+      if (el.pollingMenu.hidden) {
+        return;
+      }
+      el.pollingMenu.hidden = true;
+      el.pollingCurrent.setAttribute("aria-expanded", "false");
+      if (refocus) {
+        el.pollingCurrent.focus();
+      }
+    }
+
+    function stepPollingMenu(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePollingMenu(true);
+        return;
+      }
+      if (event.key === "Tab") {
+        closePollingMenu(false);
+        return;
+      }
+      const options = pollingOptions();
+      const at = options.indexOf(document.activeElement);
+      const next = { ArrowUp: at - 1, ArrowDown: at + 1, Home: 0, End: options.length - 1 }[event.key];
+      if (next === undefined) {
+        return;
+      }
+      event.preventDefault();
+      options[(next + options.length) % options.length].focus();
+    }
+
+    // ---- theme ----
+
+    function readTheme() {
+      try {
+        const stored = localStorage.getItem(THEME_KEY);
+        return THEMES.includes(stored) ? stored : "system";
+      } catch (error) {
+        return "system";
+      }
+    }
+
+    function writeTheme(choice) {
+      try {
+        localStorage.setItem(THEME_KEY, choice);
+      } catch (error) {
+        // A choice that cannot be remembered still holds for this page.
+      }
+    }
+
+    function applyTheme(choice) {
+      theme = choice;
+      if (theme === "system") {
+        delete document.documentElement.dataset.theme;
+      } else {
+        document.documentElement.dataset.theme = theme;
+      }
+      el.themeText.textContent = "Theme: " + theme;
+      el.theme.title = "Theme: " + theme;
+      el.theme.dataset.choice = theme;
+      redraw();
+    }
+
+    function cycleTheme() {
+      const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+
+      applyTheme(next);
+      writeTheme(next);
+    }
+
+    // ---- sections ----
+
+    function sensorVerdict(sensor) {
+      if (sensor.faulted) {
+        return { tone: "error", label: "faulted" };
+      }
+      if (!sensor.ready) {
+        return { tone: "none", label: "no reading" };
+      }
+      const edges = toleranceEdges(sensor);
+      if (sensor.smoothed < edges.low) {
+        return { tone: "warning", label: "below target" };
+      }
+      if (sensor.smoothed > edges.high) {
+        return { tone: "wet", label: "above target" };
+      }
+      return { tone: "ok", label: "on target" };
+    }
+
+    function applyState(sensor) {
+      document.documentElement.dataset.state = sensorVerdict(sensor).tone;
+      if (!el.state.hasAttribute("data-live")) {
+        void el.state.offsetWidth;
+        el.state.toggleAttribute("data-live", true);
+      }
+    }
+
+    // The readings of the last `seconds` of device uptime, stopping at a restart,
+    // where uptime and the total run time begin again at zero
+    function readingsSince(seconds) {
+      const now = history[history.length - 1];
+      let first = history.length - 1;
+      while (first > 0 && history[first - 1].uptime <= history[first].uptime
+             && now.uptime - history[first - 1].uptime <= seconds) {
+        first -= 1;
+      }
+      return history.slice(first);
+    }
+
+    function showRate(value) {
+      el.trendText.replaceChildren(make("b", "", value), small("%"), make("span", "trend__unit", " per minute"));
+    }
+
+    function renderTrend() {
+      const now = history[history.length - 1];
+      // At least two polls, which a slow interval spreads past a minute
+      const trendSeconds = Math.max(TREND_S, (2 * pollMs) / 1000);
+      const recent = history.length > 0 ? readingsSince(trendSeconds).filter((point) => point.smoothed !== null) : [];
+      const then = recent[0];
+      if (recent.length < 2 || now.smoothed === null || now.uptime === then.uptime) {
+        el.trend.dataset.direction = "none";
+        showRate("--");
+        return;
+      }
+      const rate = ((now.smoothed - then.smoothed) / (now.uptime - then.uptime)) * 60;
+      el.trend.dataset.direction = rate > 0 ? "up" : rate < 0 ? "down" : "flat";
+      showRate((rate > 0 ? "+" : rate < 0 ? "-" : "") + Math.abs(rate).toFixed(2));
+    }
+
+    function renderStats() {
+      const readings = history.filter((point) => point.smoothed !== null).map((point) => point.smoothed);
+      el.statLow.textContent = readings.length > 0 ? Math.min(...readings).toFixed(2) : "--";
+      el.statHigh.textContent = readings.length > 0 ? Math.max(...readings).toFixed(2) : "--";
+      if (history.length === 0) {
+        showNoDuration(el.statPump);
+        return;
+      }
+      const covered = readingsSince(Infinity);
+      showDuration(el.statPump, covered[covered.length - 1].totalRunTime - covered[0].totalRunTime);
+    }
+
+    function renderSensor(sensor, pump, uptime) {
+      const smoothed = sensor.ready ? sensor.smoothed.toFixed(2) : "--.--";
+      const point = smoothed.indexOf(".");
+
+      el.smoothedWhole.textContent = smoothed.slice(0, point);
+      el.smoothedDecimals.textContent = smoothed.slice(point);
+      el.target.textContent = sensor.target.toFixed(1);
+      el.tolerance.textContent = "±" + sensor.deadband.toFixed(1);
+
+      const verdict = sensorVerdict(sensor);
+      el.sensorChip.dataset.tone = verdict.tone;
+      el.verdict.textContent = verdict.label;
+
+      // A faulted burst keeps the last good figures, and the trace breaks rather
+      // than plot them as fresh.
+      if (sensor.ready) {
+        history.push({ smoothed: sensor.faulted ? null : sensor.smoothed, on: pump.on, uptime: uptime, totalRunTime: pump.totalRunTime });
+        if (history.length > HISTORY) {
+          history.shift();
+        }
+      }
+      renderTrend();
+      renderStats();
+      drawChart(sensor);
+    }
+
+    // Which stretch of its cycle the pump is in, and how far through it
+    function pumpPhase(pump, sensor) {
+      if (pump.faulted) {
+        return { name: "faulted", progress: 0 };
+      }
+      if (pump.on) {
+        // A duration lowered mid-run can leave the run past it until the stop lands.
+        return { name: "running", progress: Math.min(1, pump.currentRunTime / pump.duration) };
+      }
+      if (!pump.automatic) {
+        return { name: "disabled", progress: 0 };
+      }
+      if (pump.remainingWaitTime > 0) {
+        // The boot lockout counts in remainingWaitTime too and can outlast the wait the
+        // bar is scaled to, leaving a negative fraction to clamp.
+        const elapsed = pump.waitTime > 0 ? 1 - pump.remainingWaitTime / pump.waitTime : 0;
+        return { name: "waiting", progress: Math.max(0, Math.min(1, elapsed)) };
+      }
+      const due = sensor.ready && !sensor.faulted && sensor.smoothed < toleranceEdges(sensor).low;
+      return { name: "ready", progress: 1, due: due };
+    }
+
+    function pumpTimer(pump, phase) {
+      if (phase.name === "running") {
+        return { title: "Running for", seconds: pump.currentRunTime };
+      }
+      if (phase.name === "waiting") {
+        return { title: "Remaining wait", seconds: pump.remainingWaitTime };
+      }
+      return { title: "Idle for", seconds: pump.idleTime };
+    }
+
+    function renderPump(pump, sensor) {
+      const phase = pumpPhase(pump, sensor);
+      const timer = pumpTimer(pump, phase);
+
+      el.pumpTimeTitle.textContent = timer.title;
+      showDuration(el.pumpTime, timer.seconds);
+      showDuration(el.duration, pump.duration);
+      showDuration(el.waitTime, pump.waitTime);
+
+      el.pumpDock.dataset.phase = phase.name;
+      el.pumpDock.toggleAttribute("data-due", Boolean(phase.due));
+      el.pumpState.textContent = phase.name;
+      el.pumpProgress.style.width = phase.progress * 100 + "%";
+      renderPumpRequest(pump);
+    }
+
+    // ---- manual watering ----
+
+    let pumpRequestSending = false;
+    let pumpRequestNote = "";
+    let pumpRequestNoteTimer = 0;
+    let lastPump = null;
+
+    // Stop while any run is on, and water now otherwise. A manual run lasts the run length.
+    function renderPumpRequest(pump) {
+      lastPump = pump;
+      el.pumpRequest.dataset.request = pump.on ? "stop" : "run";
+      el.pumpRequest.disabled = pumpRequestSending || pump.faulted;
+      el.pumpRequestText.textContent = pumpRequestNote || (pump.on ? "Stop" : "Water now");
+      el.pumpRequest.title = pump.on ? "Stop watering" : "Water for " + pump.duration + " s";
+    }
+
+    // Shows the text in place of the label for a while.
+    function notePumpRequest(text) {
+      clearTimeout(pumpRequestNoteTimer);
+      pumpRequestNote = text;
+      renderPumpRequest(lastPump);
+      pumpRequestNoteTimer = setTimeout(() => {
+        pumpRequestNote = "";
+        renderPumpRequest(lastPump);
+      }, SAVED_MS);
+    }
+
+    // The device ignores a run asked for while the pump runs and a stop while it
+    // is off, which makes a click on a label one frame behind harmless.
+    function sendPumpRequest() {
+      if (!lastPump || el.pumpRequest.disabled) {
+        return;
+      }
+      pumpRequestSending = true;
+      renderPumpRequest(lastPump);
+      fetch("/api/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(lastPump.on ? { pump: { stop: true } } : { pump: { run: true } })
+      })
+        .then((response) => {
+          if (response.status === 401) {
+            loggedOut();
+            return;
+          }
+          if (!response.ok) {
+            notePumpRequest("Not sent");
+          }
+        })
+        .catch(() => notePumpRequest("Not sent"))
+        .finally(() => {
+          pumpRequestSending = false;
+          renderPumpRequest(lastPump);
+        });
+    }
+
+    function severityOf(code) {
+      return SEVERITIES[code.charAt(0)] || "unknown";
+    }
+
+    function bySeverity(left, right) {
+      return ORDER.indexOf(severityOf(left.code)) - ORDER.indexOf(severityOf(right.code));
+    }
+
+    function renderFaults(faults) {
+      [el.errorCount, el.warningCount].forEach((count) => {
+        const counter = count.parentElement;
+        const severity = counter.dataset.severity;
+        const total = faults.filter((fault) => fault.active && severityOf(fault.code) === severity).length;
+        count.textContent = total;
+        counter.title = total + " active " + severity + (total === 1 ? "" : "s");
+        counter.hidden = total === 0;
+      });
+    }
+
+    const RESET_REASONS = {
+      powerOn: "power on",
+      external: "reset pin",
+      software: "restart",
+      panic: "crash",
+      interruptWdt: "interrupt watchdog",
+      taskWdt: "task watchdog",
+      otherWdt: "watchdog",
+      deepSleep: "deep sleep wake",
+      brownout: "brownout",
+      sdio: "SDIO",
+      usb: "USB",
+      jtag: "JTAG",
+      efuse: "eFuse error",
+      powerGlitch: "power glitch",
+      cpuLockup: "CPU lockup",
+      unknown: "unknown"
+    };
+
+    const WIFI_MODES = { sta: "station", ap: "access point", apsta: "station and access point" };
+
+    // No reading means the station has not joined yet.
+    function wifiSignalParts(station) {
+      if (typeof station.rssi !== "number") {
+        return ["not joined"];
+      }
+      const band = station.rssi >= -50 ? "excellent"
+        : station.rssi >= -60 ? "good"
+        : station.rssi >= -70 ? "fair"
+        : "weak";
+      return [String(station.rssi), small("dBm"), " · " + band];
+    }
+
+    function textOrDash(value) {
+      return typeof value === "string" ? value : "--";
+    }
+
+    function chipText(chip) {
+      if (!chip.model) {
+        return "--";
+      }
+      return chip.revision ? chip.model + " · " + chip.revision : chip.model;
+    }
+
+    // Whether the device is on a network, or null while the frame carries none.
+    // A station counts once it has joined, an access point of its own always.
+    function networkConnected(network) {
+      const wifi = network.wifi;
+      if (!wifi) {
+        return null;
+      }
+      return wifi.mode === "ap" || typeof (wifi.station || {}).rssi === "number";
+    }
+
+    function showNetwork(network) {
+      const connected = networkConnected(network);
+      el.network.hidden = connected === null;
+      if (connected === null) {
+        return;
+      }
+      const text = connected ? "Network: connected" : "Network: not connected";
+      el.network.dataset.connected = connected;
+      el.network.title = text;
+      el.networkText.textContent = text;
+    }
+
+    function renderDevice(device) {
+      showNetwork(device.network || {});
+    }
+
+    // ---- details ----
+
+    function readPart() {
+      try {
+        const stored = localStorage.getItem(PART_KEY);
+        return PARTS.includes(stored) ? stored : PARTS[0];
+      } catch (error) {
+        return PARTS[0];
+      }
+    }
+
+    function writePart(part) {
+      try {
+        localStorage.setItem(PART_KEY, part);
+      } catch (error) {
+        // A part that cannot be remembered still stays open on this page.
+      }
+    }
+
+    function partOptions() {
+      return Array.from(el.detailsMenu.querySelectorAll('[role="menuitemradio"]'));
+    }
+
+    // One part is always open, and its name is the heading.
+    function selectPart(part) {
+      partOptions().forEach((option) => {
+        const selected = option.dataset.part === part;
+        option.setAttribute("aria-checked", selected);
+        if (selected) {
+          el.detailsCurrentName.textContent = option.firstChild.textContent.trim();
+        }
+        panels[option.dataset.part].hidden = !selected;
+      });
+      renderCurrentCount();
+      writePart(part);
+    }
+
+    function openDetailsMenu() {
+      el.detailsMenu.hidden = false;
+      el.detailsCurrent.setAttribute("aria-expanded", "true");
+      el.detailsMenu.querySelector('[aria-checked="true"]').focus();
+    }
+
+    function closeDetailsMenu(refocus) {
+      if (el.detailsMenu.hidden) {
+        return;
+      }
+      el.detailsMenu.hidden = true;
+      el.detailsCurrent.setAttribute("aria-expanded", "false");
+      if (refocus) {
+        el.detailsCurrent.focus();
+      }
+    }
+
+    function stepDetailsMenu(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDetailsMenu(true);
+        return;
+      }
+      if (event.key === "Tab") {
+        closeDetailsMenu(false);
+        return;
+      }
+      const options = partOptions();
+      const at = options.indexOf(document.activeElement);
+      const next = { ArrowUp: at - 1, ArrowDown: at + 1, Home: 0, End: options.length - 1 }[event.key];
+      if (next === undefined) {
+        return;
+      }
+      event.preventDefault();
+      options[(next + options.length) % options.length].focus();
+    }
+
+    // The Faults entry counts what is active now, in the color of the worst of it.
+    function renderFaultCount(faults) {
+      const active = faults.filter((fault) => fault.active).sort(bySeverity);
+      el.faultCount.textContent = String(active.length);
+      el.faultCount.dataset.tone = active.length > 0 ? severityOf(active[0].code) : "none";
+      el.faultCount.hidden = active.length === 0;
+      renderCurrentCount();
+    }
+
+    // The heading carries the count too while Faults is open.
+    function renderCurrentCount() {
+      el.detailsCurrentCount.textContent = el.faultCount.textContent;
+      el.detailsCurrentCount.dataset.tone = el.faultCount.dataset.tone || "none";
+      el.detailsCurrentCount.hidden = el.faultCount.hidden || panels.faults.hidden;
+    }
+
+    // ---- details panels ----
+
+    const panels = {};
+    PARTS.forEach((part) => {
+      panels[part] = document.getElementById(part);
+    });
+
+    function row(label, value) {
+      return make("div", "rows__row", make("dt", "", label), make("dd", "", ...value));
+    }
+
+    function rows(items, single) {
+      return make("dl", single ? "rows rows--single" : "rows", ...items);
+    }
+
+    function soilPanel(sensor) {
+      const ready = sensor.ready;
+      return rows([
+        row("Smoothed reading", ready ? percentParts(sensor.smoothed, 2) : ["--", small("%")]),
+        row("Latest reading", ready ? percentParts(sensor.latest, 2) : ["--", small("%")]),
+        // A count past the dry end can arrive before any usable reading, and is never 0.
+        row("Raw reading", [ready || sensor.raw > 0 ? String(sensor.raw) : "--"]),
+        row("Wet point", [String(sensor.calibration.adcMin)]),
+        row("Dry point", [String(sensor.calibration.adcMax)]),
+        row("Target", percentParts(sensor.target, 1)),
+        row("Tolerance band", ["±" + sensor.deadband.toFixed(1), small("%")])
+      ]);
+    }
+
+    function pumpPanel(pump) {
+      return rows([
+        row("Running for", pump.on ? timeParts(pump.currentRunTime) : noTime()),
+        row("Idle for", pump.on ? noTime() : timeParts(pump.idleTime)),
+        row("Remaining wait", timeParts(pump.remainingWaitTime)),
+        row("Automatic watering", [pump.automatic ? "enabled" : "disabled"]),
+        row("Run length", timeParts(pump.duration)),
+        row("Wait between runs", timeParts(pump.waitTime)),
+        row("Runs", [String(pump.runCount)]),
+        row("Total run time", timeParts(pump.totalRunTime))
+      ]);
+    }
+
+    function devicePanel(device) {
+      const chip = device.chip || {};
+      const firmware = device.firmware || {};
+      const items = [
+        row("Name", [textOrDash(device.name)]),
+        row("Firmware", [firmware.version || "--"]),
+        row("Build", [firmware.build || "--"]),
+        row("Uptime", timeParts(device.uptime)),
+        row("Last reset", [RESET_REASONS[device.resetReason] || device.resetReason || "--"]),
+        row("Core dump", [typeof device.coreDump === "boolean" ? (device.coreDump ? "stored" : "none") : "--"]),
+        row("Chip", [chipText(chip)]),
+        row("Chip temperature", typeof chip.temperature === "number" ? [chip.temperature.toFixed(1), small("°C")] : ["--", small("°C")])
+      ];
+      // The WiFi rows only while the frame carries WiFi, and the station and
+      // access point rows only for the roles the radio runs
+      const wifi = (device.network || {}).wifi;
+      if (wifi) {
+        const mode = row("WiFi mode", [WIFI_MODES[wifi.mode] || wifi.mode]);
+        mode.classList.add("rows__row--next-column");
+        items.push(mode);
+        items.push(row("WiFi channel", [typeof wifi.channel === "number" ? String(wifi.channel) : "--"]));
+      }
+      const station = wifi && wifi.station;
+      if (station) {
+        items.push(row("WiFi signal", wifiSignalParts(station)));
+        items.push(row("WiFi reconnects", [typeof station.reconnects === "number" ? String(station.reconnects) : "--"]));
+        items.push(row("IP address", [textOrDash(station.ipv4)]));
+        items.push(row("MAC address", [textOrDash(station.mac)]));
+        items.push(row("BSSID", [textOrDash(station.bssid)]));
+      }
+      const accessPoint = wifi && wifi.accessPoint;
+      if (accessPoint) {
+        items.push(row("AP IP address", [textOrDash(accessPoint.ipv4)]));
+        items.push(row("AP clients", [typeof accessPoint.clients === "number" ? String(accessPoint.clients) : "--"]));
+      }
+      // The MQTT rows only while the frame carries MQTT
+      const mqtt = (device.messaging || {}).mqtt;
+      if (mqtt) {
+        const link = row("MQTT", [mqtt.connected ? "connected" : "disconnected"]);
+        if (!wifi) {
+          link.classList.add("rows__row--next-column");
+        }
+        items.push(link);
+        items.push(row("MQTT reconnects", [typeof mqtt.reconnects === "number" ? String(mqtt.reconnects) : "--"]));
+      }
+      return rows(items);
+    }
+
+    // A KB is 1024 bytes, as ESP-IDF counts its heaps.
+    function byteParts(bytes) {
+      if (typeof bytes !== "number") {
+        return ["--", small("KB")];
+      }
+      return [make("span", "memory__amount", (bytes / 1024).toFixed(1), small("KB")), " ",
+              make("span", "memory__exact", "(" + bytes, small("B"), ")")];
+    }
+
+    function heapBlock(name, usage) {
+      // The bar fills with what is free, like a battery
+      const known = usage.total > 0 && typeof usage.free === "number";
+      const free = known ? usage.free / usage.total * 100 : 0;
+      const fill = make("i", "memory__fill");
+      fill.style.width = free + "%";
+      const bar = make("div", "memory__bar", fill);
+      bar.setAttribute("role", "meter");
+      bar.setAttribute("aria-label", name + " free");
+      bar.setAttribute("aria-valuemin", "0");
+      bar.setAttribute("aria-valuemax", "100");
+      bar.setAttribute("aria-valuenow", free.toFixed(0));
+      bar.setAttribute("aria-valuetext", known ? free.toFixed(0) + "% free" : "unknown");
+      return make("div", "memory__heap",
+        make("div", "memory__head", make("span", "memory__name", name),
+          make("span", "memory__free", ...byteParts(usage.free), " free of ", ...byteParts(usage.total))),
+        bar,
+        rows([
+          row("Lowest free", byteParts(usage.minFree)),
+          row("Largest free block", byteParts(usage.largestFreeBlock)),
+          row("Free blocks", [typeof usage.freeBlocks === "number" ? String(usage.freeBlocks) : "--"])
+        ]));
+    }
+
+    function memoryPanel(device) {
+      const heap = device.heap || {};
+      const heaps = [heapBlock("Internal RAM", heap.internal || {})];
+      if (heap.psram) {
+        heaps.push(heapBlock("PSRAM", heap.psram));
+      }
+      return make("div", "memory", ...heaps);
+    }
+
+    function faultRow(fault) {
+      const item = make("div", "rows__row fault", make("dt", "fault__code", fault.code),
+        make("dd", "fault__severity", severityOf(fault.code)));
+      item.dataset.severity = severityOf(fault.code);
+      item.dataset.active = fault.active;
+      return item;
+    }
+
+    function faultGroup(title, faults) {
+      return make("div", "", make("h3", "faults__title", title),
+        faults.length > 0 ? rows(faults.map(faultRow), true) : make("p", "faults__none", "none"));
+    }
+
+    function faultsPanel(faults) {
+      if (faults.length === 0) {
+        return make("p", "details__empty", "No faults reported");
+      }
+      return make("div", "faults",
+        faultGroup("Active", faults.filter((fault) => fault.active).sort(bySeverity)),
+        faultGroup("Not active", faults.filter((fault) => !fault.active).sort(bySeverity)));
+    }
+
+    function renderPanels(telemetry) {
+      panels.soil.replaceChildren(soilPanel(telemetry.sensor));
+      panels.pump.replaceChildren(pumpPanel(telemetry.pump));
+      panels.device.replaceChildren(devicePanel(telemetry.device));
+      panels.memory.replaceChildren(memoryPanel(telemetry.device));
+      panels.faults.replaceChildren(faultsPanel(telemetry.faults));
+    }
+
+    // ---- settings ----
+
+    // What an input holds as the frame would carry it, or null when it holds
+    // nothing usable. A toggle holds a boolean once either side is picked.
+    function held(setting) {
+      const input = el[setting.input];
+      if (setting.toggle) {
+        return input.checked || el[setting.toggle].checked ? input.checked : null;
+      }
+      if (input.value === "" || !input.checkValidity()) {
+        return null;
+      }
+      return Number(input.value);
+    }
+
+    // A device value in the form its input shows it
+    function shown(setting, value) {
+      return setting.toggle ? value : value.toFixed(setting.decimals);
+    }
+
+    function groupOf(source, group) {
+      return PATHS[group].reduce((node, key) => node[key], source);
+    }
+
+    // The changed groups nested as the command carries them
+    function toCommand(changed) {
+      const command = {};
+      Object.keys(changed).forEach((group) => {
+        const path = PATHS[group];
+        let node = command;
+        path.slice(0, -1).forEach((key) => {
+          node[key] = node[key] || {};
+          node = node[key];
+        });
+        node[path[path.length - 1]] = Object.assign(node[path[path.length - 1]] || {}, changed[group]);
+      });
+      return command;
+    }
+
+    function current(setting) {
+      return setting.toggle ? held(setting) : el[setting.input].value;
+    }
+
+    function fill(setting, fresh) {
+      if (setting.toggle) {
+        el[setting.input].checked = fresh;
+        el[setting.toggle].checked = !fresh;
+        return;
+      }
+      el[setting.input].value = fresh;
+    }
+
+    // Every field of a group as its input holds it, or null when one of them is
+    // unusable, because a pair cannot be judged with half of it missing
+    function wholeGroup(group) {
+      const whole = {};
+      let complete = true;
+
+      SETTINGS.forEach((setting) => {
+        if (setting.group !== group) {
+          return;
+        }
+        const value = held(setting);
+        if (value === null) {
+          complete = false;
+          return;
+        }
+        whole[setting.field] = value;
+      });
+      return complete ? whole : null;
+    }
+
+    // Only the fields that differ from what the device runs on
+    function pending() {
+      const changed = {};
+      if (live === null) {
+        return changed;
+      }
+
+      SETTINGS.forEach((setting) => {
+        const value = held(setting);
+        if (value === null) {
+          return;
+        }
+        if (value !== groupOf(live, setting.group)[setting.field]) {
+          changed[setting.group] = changed[setting.group] || {};
+          changed[setting.group][setting.field] = value;
+        }
+      });
+      PAIRED.forEach((group) => {
+        if (changed[group] === undefined) {
+          return;
+        }
+        const whole = wholeGroup(group);
+        if (whole === null) {
+          delete changed[group];
+        } else {
+          changed[group] = whole;
+        }
+      });
+      return changed;
+    }
+
+    // Target and band bound each other, which no single input's min/max can
+    // express. An empty field reads NaN and raises nothing.
+    function toleranceOutOfRange() {
+      const target = el.setTarget.valueAsNumber;
+      const tolerance = el.setTolerance.valueAsNumber;
+      return target - tolerance < 0 || target + tolerance > 100;
+    }
+
+    // The two ends bound each other like the band. An empty field reads NaN and
+    // raises nothing.
+    function calibrationCrossed() {
+      return el.setAdcMin.valueAsNumber >= el.setAdcMax.valueAsNumber;
+    }
+
+    // The ADC's full scale, 13 bits on the ESP32-S2 and 12 on every other chip
+    function fitCalibration(device) {
+      const max = device.chip.model === "esp32s2" ? 8191 : 4095;
+      el.setAdcMin.max = max;
+      el.setAdcMax.max = max;
+    }
+
+    // Save stays off while a save is pending, and after an accepted save until
+    // the form changes, which keeps a change from being sent twice.
+    let saving = false;
+    let accepted = null;
+
+    function markEdited() {
+      SETTINGS.forEach((setting) => {
+        const field = el[setting.input].closest(".setting");
+        const value = live === null ? null : groupOf(live, setting.group)[setting.field];
+        const now = held(setting);
+        const changed = value !== null && now !== null && now !== value;
+        field.toggleAttribute("data-edited", changed);
+      });
+    }
+
+    function refreshSave() {
+      const changed = JSON.stringify(pending());
+      if (changed === "{}") {
+        accepted = null;
+      }
+      markEdited();
+      el.toleranceAlert.hidden = !toleranceOutOfRange();
+      el.calibrationAlert.hidden = !calibrationCrossed();
+      el.save.disabled = saving || changed === "{}" || changed === accepted || toleranceOutOfRange()
+        || calibrationCrossed();
+    }
+
+    // A field that is unedited, or already matches the device after a save,
+    // follows the device. One being edited is left alone.
+    function seed() {
+      SETTINGS.forEach((setting) => {
+        const input = el[setting.input];
+        const value = groupOf(live, setting.group)[setting.field];
+        const fresh = shown(setting, value);
+        const untouched = seeded[setting.input] === undefined
+          || current(setting) === seeded[setting.input]
+          || held(setting) === value;
+
+        if (untouched && document.activeElement !== input) {
+          fill(setting, fresh);
+          seeded[setting.input] = fresh;
+        }
+      });
+    }
+
+    function sizeSettings() {
+      SETTINGS.forEach((setting) => {
+        if (setting.toggle) {
+          return;
+        }
+        const input = el[setting.input];
+        input.style.width = Math.max(input.value.length, 1) + 0.5 + "ch";
+      });
+    }
+
+    // - and + move a setting by its step, landing on round values, and repeat
+    // while held. Each press counts as an edit, like typing.
+    function wireStep(button) {
+      const input = button.parentElement.querySelector("input");
+      const step = Number(button.dataset.step);
+      const size = Math.abs(step);
+      const decimals = (input.step.split(".")[1] || "").length;
+      let timer = null;
+
+      function nudge() {
+        const current = input.value === "" ? Number(input.min) : Number(input.value);
+        const grid = current / size;
+        const next = step > 0 ? (Math.floor(grid + 1e-9) + 1) * size : (Math.ceil(grid - 1e-9) - 1) * size;
+        input.value = Math.min(Number(input.max), Math.max(Number(input.min), next)).toFixed(decimals);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      function stop() {
+        clearTimeout(timer);
+        clearInterval(timer);
+        timer = null;
+      }
+
+      button.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        nudge();
+        timer = setTimeout(() => {
+          timer = setInterval(nudge, 80);
+        }, 400);
+      });
+      ["pointerup", "pointerleave", "pointercancel"].forEach((name) => button.addEventListener(name, stop));
+      // A keyboard press arrives as a click with no pointer behind it.
+      button.addEventListener("click", (event) => {
+        if (event.detail === 0) {
+          nudge();
+        }
+      });
+    }
+
+    // Closing without saving drops the edits, and the fields follow the device again.
+    function discardEdits() {
+      if (live === null) {
+        return;
+      }
+      SETTINGS.forEach((setting) => {
+        const fresh = shown(setting, groupOf(live, setting.group)[setting.field]);
+        fill(setting, fresh);
+        seeded[setting.input] = fresh;
+      });
+      sayStatus("none", "");
+      sizeSettings();
+      refreshSave();
+    }
+
+    function closeSettingsNow() {
+      el.settingsDialog.toggleAttribute("data-closing", false);
+      el.settingsDialog.close();
+    }
+
+    function closeSettings() {
+      el.settingsDialog.toggleAttribute("data-closing", true);
+      // With motion turned off there is no slide to wait for.
+      if (getComputedStyle(el.settingsDialog).animationName === "none") {
+        closeSettingsNow();
+        return;
+      }
+      el.settingsDialog.addEventListener("animationend", closeSettingsNow, { once: true });
+    }
+
+    const SAVE_ERRORS = {
+      400: "the device could not read the settings",
+      408: "the connection stalled on the way. Try again",
+      413: "the device could not read the settings",
+      415: "the device could not read the settings",
+      503: "the device is busy. Try again in a moment"
+    };
+    // How long "Saved" stays before the line clears
+    const SAVED_MS = 4000;
+    let savedTimer = null;
+
+    function sayStatus(tone, text) {
+      clearTimeout(savedTimer);
+      el.saveStatus.dataset.tone = tone;
+      el.saveStatus.textContent = text;
+      if (tone === "ok") {
+        savedTimer = setTimeout(() => sayStatus("none", ""), SAVED_MS);
+      }
+    }
+
+    function save(event) {
+      event.preventDefault();
+      // Enter in a field submits too, past a Save that is off.
+      if (el.save.disabled) {
+        return;
+      }
+      const changed = pending();
+
+      saving = true;
+      refreshSave();
+      sayStatus("busy", "Saving…");
+      fetch("/api/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toCommand(changed))
+      })
+        .then((response) => {
+          if (response.status === 401) {
+            loggedOut();
+            return;
+          }
+          if (response.ok) {
+            accepted = JSON.stringify(changed);
+            sayStatus("ok", "Saved");
+            return;
+          }
+          const reason = SAVE_ERRORS[response.status] || "the device answered " + response.status;
+          sayStatus("error", "Not saved: " + reason + ".");
+        })
+        .catch(() => {
+          sayStatus("error", "Not saved: no answer from the device.");
+        })
+        .finally(() => {
+          saving = false;
+          refreshSave();
+        });
+    }
+
+    // ---- polling ----
+
+    function render(telemetry) {
+      applyState(telemetry.sensor);
+      renderSensor(telemetry.sensor, telemetry.pump, telemetry.device.uptime);
+      renderPump(telemetry.pump, telemetry.sensor);
+      renderFaults(telemetry.faults);
+      renderDevice(telemetry.device);
+      renderPanels(telemetry);
+      renderFaultCount(telemetry.faults);
+      showTitle(telemetry.sensor);
+      live = telemetry;
+      fitCalibration(telemetry.device);
+      seed();
+      sizeSettings();
+      refreshSave();
+      el.json.textContent = JSON.stringify(telemetry, null, 2);
+    }
+
+    function showTitle(sensor) {
+      document.title = (sensor.ready ? sensor.smoothed.toFixed(2) + "% - " : "") + "Plant watering";
+    }
+
+    function setConnection(state, text) {
+      el.connection.dataset.tone = state === "live" ? "none" : "error";
+      el.panel.dataset.connection = state;
+      if (el.connectionText.textContent !== text) {
+        el.connectionText.textContent = text;
+        el.connection.title = "Connection: " + text;
+      }
+    }
+
+    // The session ended while the tab was open. Only the login page restores it.
+    function loggedOut() {
+      window.location.assign("/login");
+    }
+
+    function logout() {
+      el.logout.disabled = true;
+      fetch("/logout", { method: "POST" }).finally(loggedOut);
+    }
+
+    function poll() {
+      if (polling) {
+        return;
+      }
+      polling = true;
+      fetch("/api/telemetry", { cache: "no-store" })
+        .then((response) => {
+          if (response.status === 401) {
+            loggedOut();
+            return Promise.reject(response.status);
+          }
+          if (!response.ok) {
+            return Promise.reject(response.status);
+          }
+          return response.json();
+        })
+        .then((telemetry) => {
+          setConnection("live", "live");
+          render(telemetry);
+        })
+        .catch(() => {
+          // Last values stay on screen, dimmed, since the device may just be busy.
+          setConnection("offline", "no answer from the device");
+        })
+        .finally(() => {
+          polling = false;
+        });
+    }
+
+    el.theme.addEventListener("click", cycleTheme);
+    el.logout.addEventListener("click", logout);
+    el.pumpRequest.addEventListener("click", sendPumpRequest);
+    // While the theme is "system", the OS switching repaints the chart too.
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw);
+    window.addEventListener("resize", redraw);
+    canvas.addEventListener("pointermove", hoverChart);
+    canvas.addEventListener("pointerdown", hoverChart);
+    canvas.addEventListener("pointerleave", (event) => {
+      if (event.pointerType === "mouse") {
+        clearHover();
+      }
+    });
+    // A lifting finger leaves the chart too. A tap's read-out stays until a tap elsewhere.
+    document.addEventListener("pointerdown", (event) => {
+      if (event.target !== canvas) {
+        clearHover();
+      }
+    });
+
+    el.detailsCurrent.addEventListener("click", () => {
+      if (el.detailsMenu.hidden) {
+        openDetailsMenu();
+      } else {
+        closeDetailsMenu(false);
+      }
+    });
+    el.detailsCurrent.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        openDetailsMenu();
+      }
+    });
+    el.detailsMenu.addEventListener("keydown", stepDetailsMenu);
+    partOptions().forEach((option) => {
+      option.addEventListener("pointermove", () => option.focus());
+      option.addEventListener("click", () => {
+        selectPart(option.dataset.part);
+        closeDetailsMenu(true);
+      });
+    });
+    // A press anywhere else closes the menu and leaves the open part as it was.
+    document.addEventListener("pointerdown", (event) => {
+      if (!event.target.closest(".details__picker")) {
+        closeDetailsMenu(false);
+      }
+    });
+    // The fault and network chips point at their part in Details.
+    [el.errorCount.parentElement, el.warningCount.parentElement, el.network].forEach((chip) => {
+      chip.addEventListener("click", (event) => {
+        event.preventDefault();
+        selectPart(chip.hash.slice(1));
+        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        el.details.scrollIntoView({ behavior: still ? "auto" : "smooth" });
+      });
+    });
+
+    el.form.addEventListener("submit", save);
+    el.openSettings.addEventListener("click", () => el.settingsDialog.showModal());
+    el.closeSettings.addEventListener("click", closeSettings);
+    // A click on the dim backdrop lands on the dialog itself, outside its form.
+    el.settingsDialog.addEventListener("click", (event) => {
+      if (event.target === el.settingsDialog) {
+        closeSettings();
+      }
+    });
+    // Esc would close at once, skipping the slide.
+    el.settingsDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeSettings();
+    });
+    el.settingsDialog.addEventListener("close", discardEdits);
+    document.querySelectorAll(".setting__step").forEach(wireStep);
+    document.querySelectorAll(".setting__value").forEach((value) => {
+      value.addEventListener("click", () => value.querySelector("input").focus());
+    });
+    el.form.addEventListener("input", () => {
+      sayStatus("none", "");
+      sizeSettings();
+      refreshSave();
+    });
+
+    el.pollingCurrent.addEventListener("click", () => {
+      if (el.pollingMenu.hidden) {
+        openPollingMenu();
+      } else {
+        closePollingMenu(false);
+      }
+    });
+    el.pollingCurrent.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        openPollingMenu();
+      }
+    });
+    el.pollingMenu.addEventListener("keydown", stepPollingMenu);
+    pollingOptions().forEach((option) => {
+      option.addEventListener("pointermove", () => option.focus());
+      option.addEventListener("click", () => {
+        const ms = Number(option.dataset.ms);
+        // The history starts afresh, because its points are one poll apart.
+        if (ms !== pollMs) {
+          history.length = 0;
+          hoverAge = null;
+          selectPollInterval(ms);
+          redraw();
+          renderTrend();
+          renderStats();
+          poll();
+        }
+        closePollingMenu(true);
+      });
+    });
+    document.addEventListener("pointerdown", (event) => {
+      if (!event.target.closest(".polling")) {
+        closePollingMenu(false);
+      }
+    });
+
+    applyTheme(readTheme());
+    selectPart(readPart());
+    selectPollInterval(readPollInterval());
+    poll();
+  }());
+</script>
+</body>
+</html>

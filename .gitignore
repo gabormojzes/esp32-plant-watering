@@ -1,0 +1,41 @@
+# ESP-IDF build output and downloaded components
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+
+# Only the default chip's dependency lock is pinned; other chips resolve their own
+lockfiles/*
+!lockfiles/dependencies.lock.esp32c6
+
+# Local config with real credentials (use config.example.hpp as the template)
+main/config.hpp
+
+# Editors and IDEs: VS Code, Visual Studio, CLion, Eclipse/Espressif-IDE
+.vscode/
+.vs/
+.idea/
+cmake-build-*/
+.settings/
+.project
+.cproject
+
+# Editor swap, backup and lock files: Vim and Emacs
+*.swp
+*~
+.#*
+\#*#
+
+# clangd index
+.cache/
+
+# KiCad local view state, history, backups, autosaves and locks
+*.kicad_prl
+.history/
+*-backups/
+fp-info-cache
+_autosave-*
+*.lck
+
+# macOS
+.DS_Store

@@ -1,0 +1,5 @@
+dependencies:
+  espressif/led_strip: "^3.1.0"
+  idf:
+    # Keep in sync with the ESP-IDF version check in the top-level CMakeLists.txt.
+    version: ">=5.4.2,<6.0"

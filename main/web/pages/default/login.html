@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Plant watering</title>
+<style>
+  :root {
+    --bg: #f1f0ec;
+    --edge: #d6d3cb;
+    --ink: #3a3732;
+    --ink-2: #5f5b54;
+    --ink-3: #716d66;
+    --brand: #2f7d5b;
+    --brand-ink: #2f7d5b;
+    --state-error-ink: #b83a3a;
+    --state-error-tint: rgba(184, 58, 58, 0.09);
+    --field-height: 36px;
+    color-scheme: light;
+  }
+  /* The OS preference decides until the dashboard's theme button stores a choice. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121211;
+      --ink: #dcd9d2;
+      --ink-2: #aaa69e;
+      --ink-3: #85827b;
+      --edge: #3a3834;
+      --brand: #1f5a40;
+      --brand-ink: #5cc494;
+      --state-error-ink: #ef7474;
+      --state-error-tint: rgba(239, 116, 116, 0.12);
+      color-scheme: dark;
+    }
+  }
+  /* A stored dark choice, which a light OS preference must not undo */
+  :root[data-theme="dark"] {
+    --bg: #121211;
+    --ink: #dcd9d2;
+    --ink-2: #aaa69e;
+    --ink-3: #85827b;
+    --edge: #3a3834;
+    --brand: #1f5a40;
+    --brand-ink: #5cc494;
+    --state-error-ink: #ef7474;
+    --state-error-tint: rgba(239, 116, 116, 0.12);
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  body, h1, p { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+
+  .column { width: 100%; max-width: 380px; margin: 0 auto; padding: 0 16px; }
+
+  .bar { background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.05)) var(--brand); color: #fff; }
+  .bar__inner { padding-top: 18px; padding-bottom: 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand__title { font-size: 16px; font-weight: 600; }
+
+  .login { padding-top: 32px; padding-bottom: 32px; }
+  .login__lead { margin-bottom: 16px; font-size: 14px; color: var(--ink); }
+  .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: var(--state-error-tint);
+    color: var(--state-error-ink);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .alert:empty { display: none; }
+  .alert::before { content: "!"; flex: none; display: grid; place-items: center; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%; background: var(--state-error-ink); color: var(--bg); font-size: 10px; font-weight: 700; line-height: 1; }
+
+  .form { display: flex; flex-direction: column; gap: 16px; }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  .field__input {
+    width: 100%;
+    height: var(--field-height);
+    padding: 0 12px;
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 500;
+    outline: none;
+  }
+  .field__input:focus-visible {
+    border-color: var(--brand-ink);
+    box-shadow: inset 0 0 0 1px var(--brand-ink);
+  }
+
+  .submit {
+    height: var(--field-height);
+    border: 0;
+    border-radius: 8px;
+    background: var(--brand);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .submit:not(:disabled):hover { background: color-mix(in srgb, var(--brand) 88%, #000); }
+  .submit:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+  .submit:disabled {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--edge);
+    color: var(--ink-3);
+    cursor: default;
+  }
+
+  @media (pointer: coarse) {
+    :root { --field-height: 44px; }
+    /* iOS zooms into a field whose text is below 16px. */
+    .field__input { font-size: 16px; }
+  }
+</style>
+<script>
+  // Applied before the page paints, because a stored dark choice must never flash light.
+  try {
+    const stored = localStorage.getItem("theme");
+    if (stored === "light" || stored === "dark") {
+      document.documentElement.dataset.theme = stored;
+    }
+  } catch (error) {
+    // Storage may be blocked, leaving the OS preference in charge.
+  }
+</script>
+</head>
+<body>
+  <header class="bar">
+    <div class="bar__inner column">
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5s-6.5 7.2-6.5 12a6.5 6.5 0 0 0 13 0c0-4.8-6.5-12-6.5-12z"/></svg>
+        <h1 class="brand__title">Plant watering</h1>
+      </div>
+    </div>
+  </header>
+
+  <main class="login column">
+    <p class="login__lead">Log in to reach this device.</p>
+    <p class="alert" id="alert" role="status" aria-live="polite"></p>
+
+    <form class="form" id="form" autocomplete="on">
+      <label class="field">
+        Username
+        <input class="field__input" id="user" name="username" autocomplete="username" autocapitalize="none"
+               autocorrect="off" spellcheck="false" required>
+      </label>
+      <label class="field">
+        Password
+        <input class="field__input" id="password" name="password" type="password"
+               autocomplete="current-password" required>
+      </label>
+      <button class="submit" id="submit" type="submit">Log in</button>
+    </form>
+  </main>
+
+<script>
+  "use strict";
+
+  const el = {
+    form: document.getElementById("form"),
+    user: document.getElementById("user"),
+    password: document.getElementById("password"),
+    submit: document.getElementById("submit"),
+    alert: document.getElementById("alert")
+  };
+
+  const ERRORS = {
+    400: "The device could not read the login.",
+    401: "Wrong username or password.",
+    408: "The connection stalled on the way. Try again.",
+    413: "The device could not read the login.",
+    415: "The device could not read the login."
+  };
+
+  // Wrong credentials clear the password. Any other failure keeps what was
+  // typed, since the same login may work on a retry.
+  function fail(text, wrongCredentials) {
+    el.alert.textContent = text;
+    if (wrongCredentials) {
+      el.password.value = "";
+    }
+    el.password.focus();
+    el.submit.disabled = false;
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    el.submit.disabled = true;
+    el.alert.textContent = "";
+
+    fetch("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: el.user.value, password: el.password.value })
+    })
+      .then((response) => {
+        if (response.ok) {
+          // The cookie came with this response, and the next load serves the
+          // dashboard. Log in stays off meanwhile.
+          window.location.assign("/");
+          return;
+        }
+        fail(ERRORS[response.status] || "The device answered " + response.status + ".", response.status === 401);
+      })
+      .catch(() => fail("No answer from the device.", false));
+  }
+
+  el.form.addEventListener("submit", submit);
+  el.user.focus();
+</script>
+</body>
+</html>

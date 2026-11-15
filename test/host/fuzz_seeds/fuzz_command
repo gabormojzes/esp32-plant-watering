@@ -1,0 +1,1 @@
+{"sensor":{"target":50,"deadband":5,"calibration":{"adcMin":1000,"adcMax":3000}},"pump":{"duration":5,"waitTime":60,"automatic":false,"run":true,"stop":false}}

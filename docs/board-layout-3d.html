@@ -1,0 +1,1194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Board Layout 3D</title>
+<style>
+  :root { --stage: #f7f6f3; --card: #fff; --ink: #1f2328; --muted: #67665f; --line: #e0ded7;
+    --hover: #f3f2ee; --off: #c9c6bd; --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--card); color: var(--ink); font: 13px/1.45 var(--font);
+    overflow: hidden; }
+  body { height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding: 10px 16px;
+    border-bottom: 1px solid var(--line); }
+  .toolbar h1 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+  .toolbar__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .toolbar__views { display: flex; gap: 2px; padding: 2px; background: var(--hover); border: 1px solid var(--line);
+    border-radius: 10px; }
+  .toolbar__views button { height: 26px; padding: 0 10px; border-color: transparent; background: transparent; }
+  .toolbar__views button:hover { background: var(--card); border-color: var(--line); }
+  button { font: 500 13px/1 var(--font); height: 32px; padding: 0 12px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--card); color: var(--ink); cursor: pointer;
+    transition: background-color .15s, border-color .15s; }
+  button:hover { background: var(--hover); }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  /* An on/off button reads as a switch */
+  button[aria-pressed] { display: inline-flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; }
+  button[aria-pressed]::after { content: ""; width: 26px; height: 16px; border-radius: 999px; transition: background .15s;
+    background: radial-gradient(circle at 8px 50%, #fff 5.5px, transparent 6px), var(--off); }
+  button[aria-pressed="true"]::after { background: radial-gradient(circle at 18px 50%, #fff 5.5px, transparent 6px),
+    var(--ink); }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0; }
+  #view { position: relative; min-height: 0; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 40%, #fdfcfa, var(--stage) 70%); cursor: grab; }
+  #view:active { cursor: grabbing; }
+  #view canvas { position: absolute; inset: 0; }
+  .tools { position: absolute; right: 12px; z-index: 1; display: grid; gap: 2px; padding: 2px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  .tools--top { top: 12px; }
+  .tools--bottom { bottom: 12px; }
+  .tools button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; font-size: 17px;
+    border-color: transparent; background: transparent; }
+  .tools button:hover:enabled { background: var(--hover); }
+  .tools button:disabled { color: var(--off); cursor: default; }
+  .icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round;
+    stroke-linejoin: round; }
+  .icon--exit, #view:fullscreen .icon--enter { display: none; }
+  #view:fullscreen .icon--exit { display: block; }
+  .loading { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px;
+    color: var(--muted); font-size: 12px; pointer-events: none; }
+  .loading::before { content: ""; width: 22px; height: 22px; border: 2px solid var(--line); border-top-color: var(--ink);
+    border-radius: 50%; animation: spin .8s linear infinite; }
+  .loading--failed::before { content: none; }
+  .loading__failed, .loading--failed .loading__busy { display: none; }
+  .loading--failed .loading__failed { display: block; }
+  @keyframes spin { to { transform: rotate(1turn); } }
+  .loading:not([hidden]) ~ :is(.tools, .caption) { visibility: hidden; }
+  .caption { position: absolute; left: 16px; right: 64px; margin: 0; color: var(--muted); font-size: 12px;
+    pointer-events: none; }
+  .caption--top { top: 20px; }
+  .caption--bottom { bottom: 20px; }
+  .caption__touch { display: none; }
+  @media (pointer: coarse) { .caption__touch { display: inline; } .caption__mouse { display: none; } }
+  .ref, .badge { font: 700 11px/1 var(--font); color: var(--ink); background: var(--card); border: 1.5px solid var(--ink);
+    border-radius: 999px; white-space: nowrap; transition: background-color .15s, color .15s; }
+  .ref { padding: 3px 7px; pointer-events: none; }
+  .ref--active, .legend__item:hover .badge { background: var(--ink); color: #fff; }
+  .hide-labels .ref { display: none; }
+  .legend { overflow: auto; scrollbar-width: thin; padding: 0 16px 12px; border-left: 1px solid var(--line); }
+  .legend h2 { position: sticky; top: 0; z-index: 1; margin: 0; padding: 14px 0 8px; background: var(--card);
+    color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .legend h2 + .legend__items { margin-bottom: 6px; }
+  .legend__items { display: grid; gap: 4px; }
+  .legend__item { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: start; padding: 4px 6px;
+    margin: 0 -6px; border-radius: 8px; }
+  .legend__item:has(.badge):hover { background: var(--hover); }
+  .badge { padding: 3px 0; margin-top: 1px; text-align: center; }
+  .swatch { height: 6px; border-radius: 3px; margin-top: 7px; box-shadow: 0 0 0 1.5px #9a9890 inset; }
+  .legend__item b { display: block; font-weight: 600; }
+  .legend__item span { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 40vh; }
+    .legend { border-left: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.min.js",
+  "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.core.js": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.core.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
+}, "integrity": {
+  "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.min.js": "sha384-9bdc/m98xZLhaPIxVG2gNC2aYWzhRmURsrQYkzArHqsLSVeeqWmrumq2FsPRnJEB",
+  "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.core.min.js": "sha384-3j9YQEXY3lwfCB0T8j+4Y3dnA7/9TTX6SzmSRyT9wMgAxNYsftvmGtTZt1QQVmyH",
+  "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/controls/OrbitControls.js": "sha384-ZVBN/wmVxgX0mUGjFJXakzzdZrAF4g4aHfKyusbjoF0WsVXSoGpeM/qRaVnXtaFo",
+  "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/renderers/CSS2DRenderer.js": "sha384-sicuTcKHR+f+SfOkVkM/a5EZq0oBKqaZhIxhweXKWUtjBhdBfsP6VGFlaszbuAI4",
+  "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/geometries/RoundedBoxGeometry.js": "sha384-gHmgcgYfabbVCqiNiLLSop7dMvxAqZsQsjokoDYKyrHmCD5jCPvDvFaXaAkHtTfM",
+  "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/environments/RoomEnvironment.js": "sha384-/H49oz0ZtMgJNgMZ+OhhuMuKBOsaiC3kY0/PZSvgJJXAOJJwmSBJjzlV5lJul3MB"
+} }
+</script>
+</head>
+<body>
+<header class="toolbar">
+  <h1>Board Layout 3D</h1>
+  <div class="toolbar__controls">
+    <div class="toolbar__views">
+      <button id="reset" type="button">Reset view</button>
+      <button id="top" type="button">Top</button>
+      <button id="under" type="button">Underside</button>
+    </div>
+    <button id="labels" type="button" aria-pressed="true">Labels</button>
+  </div>
+</header>
+<main class="layout">
+<div id="view">
+  <div class="loading" id="loading" role="status">
+    <span class="loading__busy">Loading the 3D view…</span>
+    <span class="loading__failed">The 3D view could not load. It needs an internet connection.</span>
+  </div>
+  <div class="tools tools--top">
+    <button id="fullscreen" type="button" aria-label="Full screen">
+      <svg class="icon icon--enter" viewBox="0 0 14 14"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg>
+      <svg class="icon icon--exit" viewBox="0 0 14 14"><path d="M5 1v4H1M13 5H9V1M9 13V9h4M1 9h4v4"/></svg>
+    </button>
+  </div>
+  <p class="caption caption--top">Parts are drawn for illustration.</p>
+  <p class="caption caption--bottom">
+    <span class="caption__mouse">Drag to rotate, scroll to zoom, right-drag to pan</span>
+    <span class="caption__touch">Drag to rotate, pinch to zoom, two-finger drag to pan</span>
+  </p>
+  <div class="tools tools--bottom">
+    <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+    <button id="zoom-out" type="button" aria-label="Zoom out">&minus;</button>
+  </div>
+</div>
+<aside class="legend" aria-label="Parts and wires">
+  <h2>Parts</h2>
+  <div class="legend__items">
+    <div class="legend__item"><div class="badge">PCB</div><div><b>Mini solderable breadboard</b><span>50.8 x 38.1 mm, 2.54 mm hole pitch, 17 strips of A-E and F-J, two M3 holes</span></div></div>
+    <div class="legend__item"><div class="badge">U1</div><div><b>ESP32-C6-Zero</b><span>rows D and H, strips 9-1; only IO22, IO1, 3V3, GND fitted</span></div></div>
+    <div class="legend__item"><div class="badge">J1</div><div><b>Pump supply connector, 2.5 mm 3-pin</b><span>16A supply +; 15A unused; 14A supply -</span></div></div>
+    <div class="legend__item"><div class="badge">J2</div><div><b>Pump connector, 2.5 mm 2-pin</b><span>16J brown, pump +; 15J blue, pump -</span></div></div>
+    <div class="legend__item"><div class="badge">J3</div><div><b>Sensor connector, 2.5 mm 4-pin</b><span>5A yellow, data to IO1; 4A unused; 3A red, 3V3; 2A both black, GND</span></div></div>
+    <div class="legend__item"><div class="badge">Q1</div><div><b>MOSFET IRLZ44N</b><span>gate 11G, drain 12G, source 13G; standing 3 mm up, tab toward D1</span></div></div>
+    <div class="legend__item"><div class="badge">R1</div><div><b>220 Ω, 1/8 W</b><span>9I to 11I, at the gate</span></div></div>
+    <div class="legend__item"><div class="badge">R2</div><div><b>10 kΩ, 1/8 W</b><span>11J to 13J, gate to source</span></div></div>
+    <div class="legend__item"><div class="badge">R3</div><div><b>100 kΩ, 1/8 W</b><span>5B to 3B</span></div></div>
+    <div class="legend__item"><div class="badge">D1</div><div><b>1N5819</b><span>band 16H, other end 12H</span></div></div>
+    <div class="legend__item"><div class="badge">C1</div><div><b>470 µF, 8 mm</b><span>+ 16D, - 14D, across J1</span></div></div>
+  </div>
+  <h2>Wires</h2>
+  <div class="legend__items">
+    <div class="legend__item"><div class="swatch" style="background:#d3262d"></div><div><b>16E to 16F</b><span>supply + to pump +</span></div></div>
+    <div class="legend__item"><div class="swatch" style="background:#1a1a1a"></div><div><b>13E to 13F</b><span>ground to Q1 source</span></div></div>
+    <div class="legend__item"><div class="swatch" style="background:#1a1a1a"></div><div><b>13B to 14B</b><span>ground strip to J1 -</span></div></div>
+    <div class="legend__item"><div class="swatch" style="background:#1a1a1a"></div><div><b>15I to 12I</b><span>pump - to Q1 drain</span></div></div>
+    <div class="legend__item"><div class="swatch" style="background:#1a1a1a"></div><div><b>14C to 2C</b><span>J1 - to the ESP's GND, the only ground link</span></div></div>
+  </div>
+</aside>
+</main>
+<script type="module" onerror="document.getElementById('loading').classList.add('loading--failed')">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+// Millimeters. USB end toward the viewer: strip 17 at -z, strip 1 at +z, column J at -x, A at +x,
+// component side up (+y). The board's top surface is y = 0.
+const P = 2.54;
+const COL = { J: 0, I: 1, H: 2, G: 3, F: 4, E: 7, D: 8, C: 9, B: 10, A: 11 };
+const BOARD_W = 38.1, BOARD_L = 50.8, BOARD_T = 1.6;
+const HOLE_R = 0.6, RING_R = 0.98;               // 1.2 mm drill, thin plated ring
+const hx = (c) => (COL[c] - 5.5) * P;
+const hz = (n) => (9 - n) * P;
+const hole = (name) => ({ x: hx(name.slice(-1)), z: hz(parseInt(name, 10)) });
+const MOUNT_M3 = [{ x: 0, z: hz(17), r: 1.6, ring: 2.15 }, { x: 0, z: hz(1), r: 1.6, ring: 2.15 }];
+const CORNER = [[-16.35, -22.7], [16.35, -22.7], [-16.35, 22.7], [16.35, 22.7]].map(([x, z]) => ({ x, z, r: 1.1 }));
+
+// ---------- renderer, scene, camera ----------
+const view = document.getElementById("view");
+const loading = document.getElementById("loading");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(view.clientWidth, view.clientHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+// Shadows are drawn once, on the first frame, since nothing moves and the sun is fixed in the scene.
+renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.needsUpdate = true;
+view.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(view.clientWidth, view.clientHeight);
+Object.assign(labelRenderer.domElement.style, { position: "absolute", inset: "0", pointerEvents: "none" });
+view.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, view.clientWidth / view.clientHeight, 1, 1000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 25;
+controls.maxDistance = 260;
+
+// What the camera frames: the board with the leads below it, and the parts with their labels above it
+const FILL = 0.85;                               // share of the view's width and height the frame may take
+const FRAME = [];
+for (const [w, l, y0, y1] of [[BOARD_W, BOARD_L, -BOARD_T - 1.0, 0], [33, 44, 0, 17]]) {
+  for (const x of [-w / 2, w / 2]) {
+    for (const y of [y0, y1]) {
+      for (const z of [-l / 2, l / 2]) {
+        FRAME.push(new THREE.Vector3(x, y, z));
+      }
+    }
+  }
+}
+// Distance from target along dir (unit) at which the whole frame fits the view at its current aspect
+function fitDistance(dir, target) {
+  const forward = dir.clone().negate();
+  const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+  const up = new THREE.Vector3().crossVectors(right, forward);
+  const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * FILL;
+  const tanH = tanV * camera.aspect;
+  let d = 0;
+  for (const p of FRAME) {
+    const rel = p.clone().sub(target);
+    d = Math.max(d, rel.dot(dir) + Math.max(Math.abs(rel.dot(right)) / tanH, Math.abs(rel.dot(up)) / tanV));
+  }
+  return d;
+}
+function setView(dir, target) {
+  const t = new THREE.Vector3(...target);
+  const n = new THREE.Vector3(...dir).normalize();
+  camera.position.copy(t).addScaledVector(n, fitDistance(n, t));
+  controls.target.copy(t);
+  controls.update();
+}
+const resetView = () => setView([-48, 72, 88], [0, 2, 2]);
+resetView();
+
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x5a5f66, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 2.1);
+sun.position.set(-28, 120, 40);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 300 });
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xffffff, 0.6);
+fill.position.set(60, 40, -50);
+scene.add(fill);
+const under = new THREE.DirectionalLight(0xffffff, 1.6);
+under.position.set(20, -90, 30);
+scene.add(under);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.14 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -BOARD_T - 3;
+ground.receiveShadow = true;
+scene.add(ground);
+// Millimeter paper on the floor: a line every 10 mm, a stronger one every 50 mm, fading out with distance
+const floorGrid = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  uniforms: { color: { value: new THREE.Color(0x8c897f) } },
+  vertexShader: `
+    varying vec2 vFloor;
+    void main() {
+      vec4 world = modelMatrix * vec4(position, 1.0);
+      vFloor = world.xz;
+      gl_Position = projectionMatrix * viewMatrix * world;
+    }`,
+  fragmentShader: `
+    uniform vec3 color;
+    varying vec2 vFloor;
+    // 1 on a line one pixel wide, 0 between lines, whatever the zoom
+    float lines(float size) {
+      vec2 p = vFloor / size;
+      vec2 d = abs(fract(p - 0.5) - 0.5) / fwidth(p);
+      return 1.0 - min(min(d.x, d.y), 1.0);
+    }
+    void main() {
+      float a = max(lines(10.0) * 0.22, lines(50.0) * 0.45);
+      a *= 1.0 - smoothstep(40.0, 170.0, length(vFloor));
+      if (a < 0.01) {
+        discard;
+      }
+      gl_FragColor = vec4(color, a);
+    }`,
+}));
+floorGrid.rotation.x = -Math.PI / 2;
+floorGrid.position.y = ground.position.y - 0.01;
+scene.add(floorGrid);
+
+// ---------- materials ----------
+const std = (color, roughness = 0.5, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+const M = {
+  gold: std(0xcfa548, 0.34, 1),
+  tin: std(0xa7abb1, 0.4, 1),
+  solder: std(0xbfc3c8, 0.24, 1),
+  mask: std(0x15171b, 0.62),
+  fr4: std(0x2a2b24, 0.8),
+  header: std(0xf1ecdf, 0.55),
+  epoxy: std(0x1d1e20, 0.68),
+  dark: std(0x050506, 0.9),
+  rubber: std(0x2b2b2b, 0.9),
+  resistor: std(0x5c9fd8, 0.4),
+  capTop: std(0xb0b4ba, 0.38, 1),
+  esp: std(0x2b5bd0, 0.5),
+  espDark: std(0x1f4ab3, 0.55),
+  chip: std(0x1a1a1c, 0.5),
+  white: std(0xf4f4f2, 0.4),
+  ceramic: std(0xc9a77a, 0.6),
+  wire: { red: std(0xd3262d, 0.5), black: std(0x1a1a1a, 0.5) },
+};
+const BAND = { black: 0x111111, brown: 0x6b3b1f, red: 0xc3262d, orange: 0xf08a24 };
+const bandMat = Object.fromEntries(Object.entries(BAND).map(([k, v]) => [k, std(v, 0.5)]));
+
+function add(mesh, parent = scene) {
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function box(w, h, d, mat, x, y, z) {
+  const m = add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat));
+  m.position.set(x, y, z);
+  return m;
+}
+function rbox(w, h, d, r, mat, x, y, z) {
+  const m = add(new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, r), mat));
+  m.position.set(x, y, z);
+  return m;
+}
+const UP = new THREE.Vector3(0, 1, 0);
+function rod(a, b, r, mat, seg = 14) {
+  const va = new THREE.Vector3(a.x, a.y, a.z), vb = new THREE.Vector3(b.x, b.y, b.z);
+  const dir = vb.clone().sub(va);
+  const m = add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, dir.length(), seg), mat));
+  m.position.copy(va).add(vb).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(UP, dir.normalize());
+  return m;
+}
+const labelEls = {};
+function label(text, x, y, z) {
+  const el = document.createElement("div");
+  el.className = "ref";
+  el.textContent = text;
+  labelEls[text] = el;
+  const obj = new CSS2DObject(el);
+  obj.position.set(x, y, z);
+  scene.add(obj);
+}
+function canvasTexture(w, h, draw) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+// A flat printed decal lying on a surface at height y
+function decal(w, d, x, y, z, draw, px = 60) {
+  const tex = canvasTexture(Math.round(w * px), Math.round(d * px), draw);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55 }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, y, z);
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+// ---------- the board: real through-holes, plated barrels, printed both sides ----------
+function outline() {
+  const w = BOARD_W, l = BOARD_L, r = 2.4, x = -w / 2, y = -l / 2;
+  const s = new THREE.Shape();
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y);
+  s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + l - r);
+  s.quadraticCurveTo(x + w, y + l, x + w - r, y + l);
+  s.lineTo(x + r, y + l);
+  s.quadraticCurveTo(x, y + l, x, y + l - r);
+  s.lineTo(x, y + r);
+  s.quadraticCurveTo(x, y, x + r, y);
+  // Shape y is world -z once the board is laid flat
+  const holes = [];
+  for (let n = 1; n <= 17; n++) {
+    for (const c of Object.keys(COL)) {
+      holes.push({ x: hx(c), z: hz(n), r: HOLE_R });
+    }
+  }
+  for (const m of [...MOUNT_M3, ...CORNER]) {
+    holes.push(m);
+  }
+  for (const h of holes) {
+    const p = new THREE.Path();
+    p.absarc(h.x, -h.z, h.r, 0, Math.PI * 2, true);
+    s.holes.push(p);
+  }
+  return s;
+}
+const boardShape = outline();
+
+const S = 30; // texture pixels per mm
+const cxp = (x) => (x + BOARD_W / 2) * S;
+const czp = (z) => (z + BOARD_L / 2) * S;
+
+function printText(g, text, x, z, sizeMm, rot) {
+  g.save();
+  g.translate(cxp(x), czp(z));
+  g.rotate(rot);
+  g.font = `600 ${sizeMm * S}px "DejaVu Sans Mono", Menlo, Consolas, monospace`;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(text, 0, 0);
+  g.restore();
+}
+
+function topTexture() {
+  return canvasTexture(Math.round(BOARD_W * S), Math.round(BOARD_L * S), (g, w, h) => {
+    g.fillStyle = "#15171b";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "#d8b24c";
+    for (let n = 1; n <= 17; n++) {
+      for (const c of Object.keys(COL)) {
+        g.beginPath();
+        g.arc(cxp(hx(c)), czp(hz(n)), RING_R * S, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    for (const m of MOUNT_M3) {
+      g.beginPath();
+      g.arc(cxp(m.x), czp(m.z), m.ring * S, 0, Math.PI * 2);
+      g.fill();
+    }
+    // The print reads bottom-to-top with the USB end toward the viewer, as on the real board
+    const rot = -Math.PI / 2;
+    g.fillStyle = "#f1f1ee";
+    for (const c of Object.keys(COL)) {
+      printText(g, c, hx(c), hz(17) - 2.7, 1.25, rot);
+      printText(g, c, hx(c), hz(1) + 2.7, 1.25, rot);
+    }
+    for (let n = 1; n <= 17; n++) {
+      printText(g, String(n), hx("J") - 2.6, hz(n), 1.15, rot);
+      printText(g, String(n), hx("A") + 2.6, hz(n), 1.15, rot);
+    }
+  });
+}
+
+function bottomTexture() {
+  return canvasTexture(Math.round(BOARD_W * S), Math.round(BOARD_L * S), (g, w, h) => {
+    g.fillStyle = "#15171b";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "#d8b24c";
+    for (let n = 1; n <= 17; n++) {
+      for (const [a, b] of [["J", "F"], ["E", "A"]]) {
+        const x0 = Math.min(hx(a), hx(b)) - RING_R, x1 = Math.max(hx(a), hx(b)) + RING_R;
+        g.beginPath();
+        g.roundRect(cxp(x0), czp(hz(n)) - RING_R * S, (x1 - x0) * S, 2 * RING_R * S, RING_R * S);
+        g.fill();
+      }
+    }
+    for (const m of MOUNT_M3) {
+      g.beginPath();
+      g.arc(cxp(m.x), czp(m.z), m.ring * S, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+}
+
+// A printed face of the board, with the holes cut through it
+function printedFace(tex, y, bottom) {
+  const geo = new THREE.ShapeGeometry(boardShape, 24);
+  const uv = geo.attributes.uv, pos = geo.attributes.position;
+  for (let i = 0; i < uv.count; i++) {
+    const x = pos.getX(i), z = -pos.getY(i);
+    uv.setXY(i, (x + BOARD_W / 2) / BOARD_W, 1 - (z + BOARD_L / 2) / BOARD_L);
+  }
+  const m = add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0.05, side: bottom ? THREE.BackSide : THREE.FrontSide })));
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = y;
+  return m;
+}
+
+const boardBody = add(new THREE.Mesh(new THREE.ExtrudeGeometry(boardShape, { depth: BOARD_T - 0.02, bevelEnabled: false, curveSegments: 18 }), [M.mask, M.fr4]));
+boardBody.rotation.x = -Math.PI / 2;
+boardBody.position.y = -BOARD_T + 0.01;
+printedFace(topTexture(), 0.002, false);
+printedFace(bottomTexture(), -BOARD_T - 0.002, true);
+// On the free near-left margin, between the column letters J and I and the board edge
+label("PCB", (hx("J") + hx("I")) / 2, 2.5, BOARD_L / 2 - 1.4);
+
+// Plated barrels in every hole
+{
+  const plated = new THREE.MeshStandardMaterial({ color: 0xd9b04a, metalness: 0.95, roughness: 0.35, side: THREE.DoubleSide });
+  const barrels = new THREE.InstancedMesh(new THREE.CylinderGeometry(HOLE_R, HOLE_R, BOARD_T, 18, 1, true), plated, 170);
+  const m4 = new THREE.Matrix4();
+  let i = 0;
+  for (let n = 1; n <= 17; n++) {
+    for (const c of Object.keys(COL)) {
+      m4.makeTranslation(hx(c), -BOARD_T / 2, hz(n));
+      barrels.setMatrixAt(i++, m4);
+    }
+  }
+  scene.add(barrels);
+  for (const m of MOUNT_M3) {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(m.r, m.r, BOARD_T, 40, 1, true), plated);
+    b.position.set(m.x, -BOARD_T / 2, m.z);
+    scene.add(b);
+  }
+}
+
+// Solder fillet: a concave cone wetting the pad out to its rim and climbing the lead
+function filletGeometry(pad, lead, height) {
+  const pts = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    pts.push(new THREE.Vector2(lead + (pad - lead) * (1 - t) ** 2, height * t));
+  }
+  return new THREE.LatheGeometry(pts, 28);
+}
+const filletGeo = filletGeometry(0.98, 0.3, 0.8);
+// On the underside, around a lead through the hole
+function joint(name) {
+  const h = hole(name);
+  const m = add(new THREE.Mesh(filletGeo, M.solder));
+  m.rotation.x = Math.PI;
+  m.position.set(h.x, -BOARD_T, h.z);
+}
+
+// ---------- axial parts ----------
+function latheBody(profile, mat) {
+  return add(new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), 36), mat));
+}
+// Lays a lathe body (built along +y from 0 to length) between two holes at height axisY,
+// shifted sideways by `off` mm where the legs are bent to clear a neighbor
+function placeAxial(mesh, a, b, axisY, length, off = 0) {
+  const ha = hole(a), hb = hole(b);
+  const dir = new THREE.Vector3(hb.x - ha.x, 0, hb.z - ha.z).normalize();
+  const side = new THREE.Vector3(-dir.z, 0, dir.x);
+  const mid = new THREE.Vector3((ha.x + hb.x) / 2, axisY, (ha.z + hb.z) / 2).addScaledVector(side, off * Math.sign(side.x || 1));
+  mesh.quaternion.setFromUnitVectors(UP, dir);
+  mesh.position.copy(mid).addScaledVector(dir, -length / 2);
+  return { mid, dir };
+}
+// Leads: up out of the hole, a smooth bend, into the end of the body
+function axialLeads(a, b, axisY, r, length, off = 0) {
+  const ha = hole(a), hb = hole(b);
+  const dir = new THREE.Vector3(hb.x - ha.x, 0, hb.z - ha.z).normalize();
+  const side = new THREE.Vector3(-dir.z, 0, dir.x);
+  const sx = off * Math.sign(side.x || 1);
+  const mid = new THREE.Vector3((ha.x + hb.x) / 2, axisY, (ha.z + hb.z) / 2).addScaledVector(side, sx);
+  for (const [name, sgn] of [[a, -1], [b, 1]]) {
+    const h = hole(name);
+    const endPt = mid.clone().addScaledVector(dir, sgn * (length / 2 - 0.05));
+    const p0 = new THREE.Vector3(h.x, -BOARD_T - 1.0, h.z);
+    const p1 = new THREE.Vector3(h.x, Math.min(0.35, axisY * 0.3), h.z);
+    const ctl = new THREE.Vector3(h.x + side.x * sx, axisY, h.z + side.z * sx);
+    const path = new THREE.CurvePath();
+    path.add(new THREE.LineCurve3(p0, p1));
+    path.add(new THREE.QuadraticBezierCurve3(p1, ctl, endPt));
+    add(new THREE.Mesh(new THREE.TubeGeometry(path, 40, r, 10, false), M.tin));
+    joint(name);
+  }
+}
+
+function resistor(a, b, colors, ref, off = 0) {
+  // 1/8 W metal film with a slimmer waist, five bands (1 %)
+  const L = 3.3, R = 0.9, W = 0.76, axisY = R + 0.25;
+  axialLeads(a, b, axisY, 0.22, L, off);
+  const prof = [[0, 0], [0.5, 0], [R * 0.94, 0.08], [R, 0.3], [R, 0.72], [W, 1.0], [W, L - 1.0], [R, L - 0.72], [R, L - 0.3], [R * 0.94, L - 0.08], [0.5, L], [0, L]];
+  const bodyMesh = latheBody(prof, M.resistor);
+  const { mid, dir } = placeAxial(bodyMesh, a, b, axisY, L, off);
+  const at = [0.42, 0.62, 1.35, 1.95, 2.85];   // mm from the first end
+  const radii = [R, R, W, W, R];
+  colors.forEach((col, i) => {
+    const band = add(new THREE.Mesh(new THREE.CylinderGeometry(radii[i] + 0.015, radii[i] + 0.015, 0.17, 36, 1, true), bandMat[col]));
+    band.quaternion.copy(bodyMesh.quaternion);
+    band.position.copy(mid).addScaledVector(dir, at[i] - L / 2);
+  });
+  label(ref, mid.x, axisY + 2.4, mid.z);
+}
+
+// R1 220 ohm, R2 10 kohm, R3 100 kohm
+resistor("9I", "11I", ["red", "red", "black", "black", "brown"], "R1");
+resistor("13J", "11J", ["brown", "black", "black", "red", "brown"], "R2");
+resistor("5B", "3B", ["brown", "black", "black", "orange", "brown"], "R3");
+
+// D1 1N5819, DO-41: about 4.8 x 2.4 mm, gray band at the cathode (16H)
+{
+  const L = 4.8, R = 1.2, axisY = R + 0.2;
+  axialLeads("16H", "12H", axisY, 0.4, L);
+  // Matte molded epoxy, printed: the gray cathode band and the type number along the body
+  const tex = canvasTexture(512, 512, (g, w, h) => {
+    const pxV = h / L, pxU = w / (2 * Math.PI * R);
+    g.fillStyle = "#1b1c1e";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "#b9bdc2";
+    g.fillRect(0, h - 1.2 * pxV, w, 0.75 * pxV);
+    g.font = "600 52px Helvetica, Arial, sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    for (const u of [0.25, 0.75]) {
+      g.save();
+      g.translate(u * w, h - 3.0 * pxV);
+      g.rotate(-Math.PI / 2);
+      // Undoes the texture's stretch, since a millimeter around the body takes fewer pixels than
+      // one along it
+      g.scale(pxV / pxU, 1);
+      g.fillText("1N5819", 0, 0);
+      g.restore();
+    }
+  });
+  const prof = [[0, 0], [0.45, 0], [R * 0.92, 0.12], [R, 0.4], [R, L - 0.4], [R * 0.92, L - 0.12], [0.45, L], [0, L]];
+  const bodyMesh = latheBody(prof, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.62 }));
+  // Print by height along the body, not by profile point
+  const pos = bodyMesh.geometry.attributes.position, uv = bodyMesh.geometry.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    uv.setY(i, pos.getY(i) / L);
+  }
+  const { mid } = placeAxial(bodyMesh, "16H", "12H", axisY, L);
+  label("D1", mid.x, axisY + 2.6, mid.z);
+}
+
+// ---------- wires on the board: insulated solid core, ends through the holes ----------
+function wire(a, b, color, r = 0.75, off = 0) {
+  const ha = hole(a), hb = hole(b);
+  const dir = new THREE.Vector3(hb.x - ha.x, 0, hb.z - ha.z).normalize();
+  const side = new THREE.Vector3(off, 0, 0);       // vertical runs shift along x
+  const run = r + 0.55, end = 0.55;                // insulation stops 0.55 mm above the board
+  const bend = 1.3;
+  const v = (x, y, z) => new THREE.Vector3(x, y, z);
+  const A0 = v(ha.x, end, ha.z), B0 = v(hb.x, end, hb.z);
+  const A1 = v(ha.x + side.x, run, ha.z), B1 = v(hb.x + side.x, run, hb.z);
+  const A2 = A1.clone().addScaledVector(dir, bend), B2 = B1.clone().addScaledVector(dir, -bend);
+  const path = new THREE.CurvePath();
+  path.add(new THREE.QuadraticBezierCurve3(A0, A1, A2));
+  path.add(new THREE.LineCurve3(A2, B2));
+  path.add(new THREE.QuadraticBezierCurve3(B2, B1, B0));
+  add(new THREE.Mesh(new THREE.TubeGeometry(path, 120, r, 18, false), M.wire[color]));
+  // Cut insulation ends
+  for (const e of [A0, B0]) {
+    const cap = add(new THREE.Mesh(new THREE.CircleGeometry(r, 18), M.wire[color]));
+    cap.rotation.x = Math.PI / 2;
+    cap.position.copy(e);
+  }
+  // Bare tinned conductor down through the hole
+  for (const name of [a, b]) {
+    const h = hole(name);
+    rod({ x: h.x, y: -BOARD_T - 1.0, z: h.z }, { x: h.x, y: end + 0.05, z: h.z }, 0.33, M.tin, 12);
+    joint(name);
+  }
+}
+wire("16F", "16E", "red");
+wire("13F", "13E", "black");
+wire("13B", "14B", "black");
+wire("15I", "12I", "black");
+wire("14C", "2C", "black");
+
+// ---------- C1 470 uF can ----------
+{
+  const hp = hole("16D"), hn = hole("14D");
+  const cx = hp.x, cz = (hp.z + hn.z) / 2, r = 4, base = 2.4, height = 11.5;
+  for (const [h, name] of [[hp, "16D"], [hn, "14D"]]) {
+    rod({ x: h.x, y: -BOARD_T - 1.0, z: h.z }, { x: h.x, y: base + 0.2, z: h.z }, 0.3, M.tin, 10);
+    joint(name);
+  }
+  const seal = add(new THREE.Mesh(new THREE.CylinderGeometry(r - 0.5, r - 0.5, 0.8, 40), M.rubber));
+  seal.position.set(cx, base + 0.4, cz);
+  // Sleeve with the crimp groove near the top and the rolled top edge
+  const prof = [[r - 0.35, 0], [r, 0.35], [r, height - 2.2], [r - 0.25, height - 1.9], [r - 0.25, height - 1.5], [r, height - 1.2], [r, height - 0.35], [r - 0.35, height], [r - 0.6, height]];
+  // Printed sleeve: black with the gray polarity stripe toward the - leg (+z), a column of minus
+  // signs down it. The stripe straddles the texture seam, and each half is drawn at both edges.
+  const sleeveTex = canvasTexture(1024, 512, (g, w, h) => {
+    const circ = 2 * Math.PI * r, pxU = w / circ, pxV = h / height;
+    g.fillStyle = "#17191f";
+    g.fillRect(0, 0, w, h);
+    const yTop = 2.6 * pxV, yBot = h - 0.6 * pxV;
+    g.fillStyle = "#b4bac2";
+    for (const x of [-1.9 * pxU, w - 1.9 * pxU]) {
+      g.fillRect(x, yTop, 3.8 * pxU, yBot - yTop);
+    }
+    g.fillStyle = "#17191f";
+    for (let k = 0; k < 3; k++) {
+      const y = yTop + (k + 0.5) * (yBot - yTop) / 3;
+      for (const x of [-0.45 * pxU, w - 0.45 * pxU]) {
+        g.fillRect(x, y - 1.2 * pxV, 0.9 * pxU, 2.4 * pxV);
+      }
+    }
+    g.fillStyle = "#c6ccd4";
+    g.textAlign = "center";
+    for (const u of [0.32, 0.68]) {
+      g.save();
+      g.translate(u * w, h * 0.5);
+      g.rotate(-Math.PI / 2);
+      g.font = "700 46px Helvetica, Arial, sans-serif";
+      g.fillText("470\u00b5F", 0, -18);
+      g.font = "600 34px Helvetica, Arial, sans-serif";
+      g.fillText("35V", 0, 28);
+      g.restore();
+    }
+  });
+  sleeveTex.wrapS = THREE.RepeatWrapping;
+  const sleeve = latheBody(prof, new THREE.MeshStandardMaterial({ map: sleeveTex, roughness: 0.38 }));
+  sleeve.position.set(cx, base, cz);
+  // The lathe spaces its texture by profile point. Printing by height keeps the marks at their size.
+  const pos = sleeve.geometry.attributes.position, uv = sleeve.geometry.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    uv.setY(i, pos.getY(i) / height);
+  }
+  uv.needsUpdate = true;
+  // Aluminum top with the pressure vent
+  const top = add(new THREE.Mesh(new THREE.CylinderGeometry(r - 0.6, r - 0.6, 0.1, 48), M.capTop));
+  top.position.set(cx, base + height - 0.25, cz);
+  // The vent: three thin lines scored into the aluminum
+  const score = std(0x8d939b, 0.5, 1);
+  for (const ang of [0, Math.PI * 2 / 3, Math.PI * 4 / 3]) {
+    const v = box(2.3, 0.04, 0.07, score, 0, 0, 0);
+    v.position.set(cx + Math.cos(ang) * 1.15, base + height - 0.19, cz + Math.sin(ang) * 1.15);
+    v.rotation.y = -ang;
+  }
+  label("C1", cx, base + height + 2.6, cz);
+}
+
+// ---------- Q1 IRLZ44N, TO-220 standing, tab toward D1 ----------
+{
+  const names = ["11G", "12G", "13G"];
+  const legs = names.map(hole);
+  const xl = hx("G"), zc = legs[1].z;
+  const lift = 3.0;                           // body bottom above the board, clears D1
+  const bodyH = 9.2, bodyL = 10.0, tabT = 1.3, bodyT = 4.4, tabH = 15.6;
+  const xBack = xl + 1.9, xFront = xBack - bodyT;
+  // Legs: wide shoulder under the body, then the thin lead into the hole
+  legs.forEach((h, i) => {
+    box(0.5, lift - 1.2 + BOARD_T + 1.0, 0.8, M.tin, h.x, (lift - 1.2 - BOARD_T - 1.0) / 2, h.z);
+    box(0.5, 1.2, 1.4, M.tin, h.x, lift - 0.6, h.z);
+    joint(names[i]);
+  });
+  // Epoxy body, metal tab at the back reaching above it with its mounting hole
+  // Mirrored about the leg line, which turns the tab toward D1 and the front toward the channel
+  const mx = (v) => 2 * xl - v;
+  rbox(bodyT - tabT, bodyH, bodyL, 0.35, M.epoxy, mx(xFront + (bodyT - tabT) / 2), lift + bodyH / 2, zc);
+  // Tab outline, its right half from the bottom up; the left half mirrors it
+  const hw = bodyL / 2;
+  const nz = bodyH + 0.6;               // side notches just above the epoxy
+  const right = [
+    [hw, 0],
+    [hw, nz],                           // side notch
+    [hw - 0.45, nz + 0.4],
+    [hw - 0.45, nz + 1.3],
+    [hw, nz + 1.7],
+    [hw, tabH - 0.8],                   // chamfered top corner
+    [hw - 0.8, tabH],
+  ];
+  const left = right.map(([x, y]) => [-x, y]).reverse();
+  const tabShape = new THREE.Shape([...right, ...left].map(([x, y]) => new THREE.Vector2(x, y)));
+  // Mounting hole
+  const th = new THREE.Path();
+  th.absarc(0, tabH - 2.8, 1.8, 0, Math.PI * 2, true);
+  tabShape.holes.push(th);
+  const tab = add(new THREE.Mesh(new THREE.ExtrudeGeometry(tabShape, { depth: tabT, bevelEnabled: false, curveSegments: 24 }), M.tin));
+  tab.rotation.y = Math.PI / 2;
+  tab.position.set(mx(xBack), lift, zc);
+  // Marking on the front face
+  const tex = canvasTexture(512, 470, (g, w, h) => {
+    g.fillStyle = "#1c1c1e";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "#b9bdc3";
+    g.textAlign = "center";
+    g.font = "700 70px Helvetica, Arial, sans-serif";
+    g.fillText("IRLZ44N", w / 2, 190);
+    g.font = "500 44px Helvetica, Arial, sans-serif";
+    g.fillText("2219", w / 2, 290);
+  });
+  const face = add(new THREE.Mesh(new THREE.PlaneGeometry(bodyL * 0.86, bodyH * 0.8), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 })));
+  face.position.set(mx(xFront) + 0.002, lift + bodyH / 2, zc);
+  face.rotation.y = Math.PI / 2;
+  label("Q1", mx(xFront + 1.5), lift + tabH + 2.4, zc);
+}
+
+// ---------- 2.5 mm wire-to-board header: a closed back wall behind the pins, open at the front; no
+// latch, the plug's end ribs ride in slots in the end posts; the open front faces the board edge; the
+// plug is not drawn ----------
+function connector(pins, outward, ref) {
+  const hs = pins.map(hole);
+  const zs = hs.map((h) => h.z);
+  const zc = (Math.min(...zs) + Math.max(...zs)) / 2, xp = hs[0].x;
+  const L = (pins.length - 1) * 2.5 + 5.0, z0 = zc - L / 2, z1 = zc + L / 2;
+  const BACK = 1.6, FRONT = 2.2, WALL = 1.15, H = 6.0, FLOOR = 1.5, POST = 1.0;
+  // d runs from the pin line toward the open front
+  const at = (d) => xp + outward * d;
+  const part = (d0, d1, y0, y1, zA, zB) =>
+    box(d1 - d0, y1 - y0, zB - zA, M.header, at((d0 + d1) / 2), (y0 + y1) / 2, (zA + zB) / 2);
+  // A (d, y) cross-section run along the row from zA to zB
+  const profile = (pts, zA, zB) => {
+    const s = new THREE.Shape(pts.map(([d, y]) => new THREE.Vector2(at(d), y)));
+    const m = add(new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: zB - zA, bevelEnabled: false }), M.header));
+    m.position.z = zA;
+  };
+  // Span of width w inward from a body end
+  const fromEnd = (zEnd, inward, w) => [Math.min(zEnd, zEnd + inward * w), Math.max(zEnd, zEnd + inward * w)];
+  const ends = [[z0, 1], [z1, -1]];
+
+  // Floor, the low lip along the open front, and the back wall
+  profile([[-BACK, 0.3], [FRONT, 0.3], [FRONT, 1.1], [1.2, 1.1], [0.8, FLOOR], [-WALL, FLOOR], [-WALL, H], [-BACK, H]], z0, z1);
+  // Standoffs: the underside clears the board by 0.3 mm for 1.5 mm around each pin
+  let zf = z0;
+  for (const z of [...[...zs].sort((a, b) => a - b), z1 + 0.75]) {
+    part(-BACK, FRONT, 0, 0.3, zf, z - 0.75);
+    zf = z + 0.75;
+  }
+  // End posts: a full-height block behind the slot (pocketed on its inner face), and a front block
+  // that slopes down into the slot
+  for (const [zEnd, inward] of ends) {
+    part(-0.65, 0.2, FLOOR, H, ...fromEnd(zEnd, inward, POST));
+    part(-WALL, -0.65, FLOOR, H, ...fromEnd(zEnd, inward, 0.45));
+    profile([[0.65, 0.3], [FRONT, 0.3], [FRONT, 5.2], [1.2, 5.2], [0.65, 4.55]], ...fromEnd(zEnd, inward, POST));
+  }
+  hs.forEach((h, i) => {
+    box(0.64, 5.1 + BOARD_T + 1.0, 0.64, M.gold, h.x, (5.1 - BOARD_T - 1.0) / 2, h.z);
+    joint(pins[i]);
+  });
+  label(ref, at((FRONT - BACK) / 2), H + 2.5, zc);
+}
+connector(["16J", "15J"], -1, "J2");
+connector(["16A", "15A", "14A"], 1, "J1");
+connector(["5A", "4A", "3A", "2A"], 1, "J3");
+
+// ---------- U1 ESP32-C6-Zero, drawn: 18 x 23.5 mm, pin rows D and H on strips 9..1 ----------
+{
+  const xL = hx("H"), xR = hx("D");
+  const x0 = xL - 1.38, x1 = xR + 1.38;
+  const zFar = hz(9) - 1.59, zNear = hz(1) + 1.59;
+  const mW = x1 - x0, mL = zNear - zFar, mx = (x0 + x1) / 2, mz = (zFar + zNear) / 2;
+  const header = 2.5, t = 1.0, yB = header, yT = header + t;
+  // Part positions from the maker's drawing, mm from the module's far-left corner (pin 22, antenna end)
+  const at = (u, v) => ({ x: x0 + u, z: zFar + v });
+
+  // Black header strips under both pin rows; only IO22, IO1, 3V3 and GND keep their pins
+  for (const xs of [xL, xR]) {
+    rbox(2.5, header, 9 * P, 0.2, M.epoxy, xs, header / 2, (hz(9) + hz(1)) / 2);
+  }
+  for (const name of ["9H", "5D", "3D", "2D"]) {
+    const h = hole(name);
+    box(0.64, yT + 0.8 + BOARD_T + 1.0, 0.64, M.gold, h.x, (yT + 0.8 - BOARD_T - 1.0) / 2, h.z);
+    // Soldered to the module's plated hole: a fillet up the pin on its top side
+    const top = add(new THREE.Mesh(filletGeometry(0.75, 0.32, 0.7), M.solder));
+    top.position.set(h.x, yT, h.z);
+    joint(name);
+  }
+
+  // The module board
+  const os = new THREE.Shape();
+  const r = 1.0;
+  os.moveTo(x0 + r, -zNear);
+  os.lineTo(x1 - r, -zNear);
+  os.quadraticCurveTo(x1, -zNear, x1, -zNear + r);
+  os.lineTo(x1, -zFar - r);
+  os.quadraticCurveTo(x1, -zFar, x1 - r, -zFar);
+  os.lineTo(x0 + r, -zFar);
+  os.quadraticCurveTo(x0, -zFar, x0, -zFar - r);
+  os.lineTo(x0, -zNear + r);
+  os.quadraticCurveTo(x0, -zNear, x0 + r, -zNear);
+  const pcb = add(new THREE.Mesh(new THREE.ExtrudeGeometry(os, { depth: t, bevelEnabled: false, curveSegments: 12 }), [M.esp, M.espDark]));
+  pcb.rotation.x = -Math.PI / 2;
+  pcb.position.y = yB;
+
+  // Printed top: castellated pads, pin names, button names, read upside down as the module sits
+  const px = 50;
+  const left = ["22", "21", "20", "19", "18", "15", "14", "RX", "TX"];
+  const right = ["5", "4", "3", "2", "1", "0", "3V3", "GND", "5V"];
+  const passives = [[3.3, 3.9], [5.4, 3.9], [7.4, 4.1], [9.4, 4.1], [11.5, 3.2], [13.6, 4.6], [15.0, 4.6], [13.6, 6.3],
+    [15.0, 6.3], [4.9, 8.8], [6.1, 8.8], [6.1, 10.4], [13.6, 10.8], [15.0, 10.8]];
+  const tex = canvasTexture(Math.round(mW * px), Math.round(mL * px), (g, w, h) => {
+    g.fillStyle = "#2b5bd0";
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = "rgba(255,255,255,.07)";
+    g.lineWidth = 0.25 * px;
+    for (let i = 0; i < 6; i++) {
+      g.beginPath();
+      g.moveTo(2.6 * px, (4 + i * 2.8) * px);
+      g.lineTo(6.5 * px, (5 + i * 2.6) * px);
+      g.stroke();
+    }
+    const txt = (s, u, v, size, align) => {
+      g.save();
+      g.fillStyle = "#f4f6ff";
+      g.font = `700 ${size * px}px Helvetica, Arial, sans-serif`;
+      g.textBaseline = "middle";
+      g.textAlign = align;
+      g.translate(u * px, v * px);
+      g.rotate(Math.PI);
+      g.fillText(s, 0, 0);
+      g.restore();
+    };
+    for (let i = 0; i < 9; i++) {
+      const v = 1.59 + i * P;
+      // Castellated pad: half-hole on the edge, plated hole 1.38 mm in where the header pin goes,
+      // 1.35 mm across, which leaves the pin names room in the gaps between pads
+      for (const [edge, hole] of [[0, 1.38], [mW, mW - 1.38]]) {
+        const x0p = Math.min(edge, hole) - (edge === 0 ? 0.2 : 0.82), x1p = Math.max(edge, hole) + (edge === 0 ? 0.82 : 0.2);
+        g.fillStyle = "#e0b64c";
+        g.beginPath();
+        g.roundRect(x0p * px, (v - 0.675) * px, (x1p - x0p) * px, 1.35 * px, 0.675 * px);
+        g.fill();
+        g.fillStyle = "#1a3f9b";
+        g.beginPath();
+        g.arc(edge * px, v * px, 0.45 * px, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#0d1a3a";
+        g.beginPath();
+        g.arc(hole * px, v * px, 0.42 * px, 0, Math.PI * 2);
+        g.fill();
+      }
+      // Each name sits on the hole line in the gap toward the USB end; the pair at that end, with
+      // no gap left, sits beside its pad instead
+      const last = i === 8;
+      const lv = last ? v : v + P / 2;
+      txt(left[i], last ? 3.0 : 1.38, lv, 0.8, "center");
+      txt(right[i], last ? mW - 3.0 : mW - 1.38, lv, 0.8, "center");
+    }
+    for (const [s, u] of [["BOOT", 4.9], ["RGB", 9.0], ["RST", 13.1]]) {
+      txt(s, u, 15.7, 0.85, "center");
+    }
+    g.strokeStyle = "rgba(255,255,255,.75)";
+    g.lineWidth = 0.12 * px;
+    for (const [u, v] of passives) {
+      g.strokeRect((u - 0.6) * px, (v - 0.42) * px, 1.2 * px, 0.84 * px);
+    }
+  });
+  const printed = add(new THREE.Mesh(new THREE.PlaneGeometry(mW, mL), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 })));
+  printed.rotation.x = -Math.PI / 2;
+  printed.position.set(mx, yT + 0.003, mz);
+
+  // ESP32-C6 QFN with its marking
+  {
+    const c = at(9.8, 9.4);
+    rbox(5.0, 0.85, 5.0, 0.12, M.chip, c.x, yT + 0.43, c.z);
+    for (let k = 0; k < 10; k++) {
+      const t = -2.0 + k * 0.44;
+      for (const s of [-1, 1]) {
+        box(0.22, 0.12, 0.35, M.tin, c.x + t, yT + 0.06, c.z + s * 2.62);
+        box(0.35, 0.12, 0.22, M.tin, c.x + s * 2.62, yT + 0.06, c.z + t);
+      }
+    }
+    decal(4.8, 4.8, c.x, yT + 0.862, c.z, (g, w, h) => {
+      g.fillStyle = "#1a1a1c";
+      g.fillRect(0, 0, w, h);
+      g.save();
+      g.translate(w / 2, h / 2);
+      g.rotate(Math.PI);
+      g.fillStyle = "#8f959e";
+      g.textAlign = "center";
+      g.font = `700 ${h * 0.12}px Helvetica, Arial, sans-serif`;
+      g.fillText("ESP32-C6", 0, -h * 0.04);
+      g.font = `500 ${h * 0.08}px Helvetica, Arial, sans-serif`;
+      g.fillText("22024", 0, h * 0.1);
+      g.beginPath();
+      g.arc(-w * 0.36, -h * 0.36, w * 0.035, 0, Math.PI * 2);
+      g.fill();
+      g.restore();
+    });
+  }
+  // 40 MHz crystal
+  {
+    const c = at(14.2, 8.8);
+    rbox(1.7, 0.6, 2.0, 0.1, M.ceramic, c.x, yT + 0.3, c.z);
+    rbox(1.4, 0.08, 1.6, 0.05, M.tin, c.x, yT + 0.62, c.z);
+  }
+  // LDO (SOT-23-5) and a SOT-23
+  {
+    const c = at(4.6, 6.0);
+    rbox(1.6, 1.0, 2.9, 0.1, M.chip, c.x, yT + 0.5, c.z);
+    for (const dz of [-0.95, 0, 0.95]) {
+      box(0.5, 0.15, 0.4, M.tin, c.x - 1.0, yT + 0.08, c.z + dz);
+    }
+    for (const dz of [-0.95, 0.95]) {
+      box(0.5, 0.15, 0.4, M.tin, c.x + 1.0, yT + 0.08, c.z + dz);
+    }
+  }
+  {
+    const c = at(3.1, 9.8);
+    rbox(1.3, 0.9, 2.0, 0.1, M.chip, c.x, yT + 0.45, c.z);
+  }
+  // 0402 passives
+  passives.forEach(([u, v], i) => {
+    const c = at(u, v);
+    box(1.0, 0.35, 0.5, i % 3 === 0 ? M.ceramic : M.chip, c.x, yT + 0.18, c.z);
+    for (const s of [-1, 1]) {
+      box(0.22, 0.36, 0.52, M.tin, c.x + s * 0.4, yT + 0.18, c.z);
+    }
+  });
+  // BOOT and RST tact switches: a pale plastic base under a steel cover, a small dark plunger
+  for (const u of [4.9, 13.1]) {
+    const c = at(u, 13.7);
+    rbox(3.6, 0.55, 2.8, 0.08, std(0xe6e4df, 0.55), c.x, yT + 0.28, c.z);
+    rbox(3.4, 0.14, 2.6, 0.05, M.tin, c.x, yT + 0.62, c.z);
+    for (const s of [-1, 1]) {
+      box(0.6, 0.22, 0.9, M.tin, c.x + s * 2.05, yT + 0.11, c.z);
+    }
+    const plunger = add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.4, 24), std(0x2a2b2e, 0.6)));
+    plunger.position.set(c.x, yT + 0.89, c.z);
+  }
+  // RGB LED: a small white package with the dies showing through its window
+  {
+    const c = at(9.0, 13.7);
+    rbox(1.6, 0.6, 1.6, 0.08, M.white, c.x, yT + 0.3, c.z);
+    box(1.1, 0.02, 1.1, std(0xf3efe2, 0.25), c.x, yT + 0.6, c.z);
+    box(0.35, 0.03, 0.25, std(0xc8473f, 0.4), c.x - 0.15, yT + 0.61, c.z);
+    box(0.2, 0.03, 0.25, std(0x4c9a5a, 0.4), c.x + 0.25, yT + 0.61, c.z);
+  }
+  // 2.4 GHz ceramic chip antenna at the far end: red body, tinned end terminals, printed C3
+  {
+    const c = at(8.4, 1.2);
+    rbox(4.0, 0.9, 1.6, 0.1, std(0xd8343a, 0.45), c.x, yT + 0.45, c.z);
+    for (const s of [-1, 1]) {
+      rbox(0.5, 0.92, 1.62, 0.06, M.tin, c.x + s * 1.75, yT + 0.46, c.z);
+    }
+    decal(2.6, 1.3, c.x, yT + 0.902, c.z, (g, w, h) => {
+      g.fillStyle = "#d8343a";
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = "#f6f1ee";
+      g.font = `700 ${h * 0.8}px Helvetica, Arial, sans-serif`;
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.translate(w / 2, h / 2);
+      g.rotate(Math.PI);
+      g.fillText("C3", 0, 0);
+    });
+  }
+  // USB-C receptacle past the near end: a drawn stainless shell of stadium section with the dark
+  // insert and contact tongue inside its mouth
+  {
+    const usbL = 7.35, w = 8.94, h = 3.26, wall = 0.25, zMouth = zNear + 1.3, yc = yT + h / 2;
+    const stadium = (sw, sh) => {
+      const s = new THREE.Shape(), r = sh / 2;
+      s.absarc(sw / 2 - r, 0, r, -Math.PI / 2, Math.PI / 2, false);
+      s.absarc(-sw / 2 + r, 0, r, Math.PI / 2, Math.PI * 3 / 2, false);
+      return s;
+    };
+    const shellShape = stadium(w, h);
+    shellShape.holes.push(stadium(w - 2 * wall, h - 2 * wall));
+    const shell = add(new THREE.Mesh(new THREE.ExtrudeGeometry(shellShape, { depth: usbL, bevelEnabled: false, curveSegments: 20 }), M.tin));
+    shell.position.set(mx, yc, zMouth - usbL);
+    // Closed back and the insert filling the shell behind the mouth
+    const back = add(new THREE.Mesh(new THREE.ShapeGeometry(stadium(w, h), 20), M.tin));
+    back.rotation.y = Math.PI;
+    back.position.set(mx, yc, zMouth - usbL);
+    const insert = add(new THREE.Mesh(new THREE.ExtrudeGeometry(stadium(w - 2 * wall, h - 2 * wall), { depth: usbL - 1.6, bevelEnabled: false, curveSegments: 20 }), M.dark));
+    insert.position.set(mx, yc, zMouth - usbL);
+    // Tongue with six contacts on each face
+    box(5.6, 0.6, 1.5, std(0x2a2a2c, 0.5), mx, yc, zMouth - 0.85);
+    for (let k = 0; k < 6; k++) {
+      for (const s of [-1, 1]) {
+        box(0.3, 0.04, 1.2, M.gold, mx - 2.0 + k * 0.8, yc + s * 0.31, zMouth - 0.8);
+      }
+    }
+    // Locating hole punched in the top of the shell
+    const dimple = add(new THREE.Mesh(new THREE.CircleGeometry(0.35, 20), M.dark));
+    dimple.rotation.x = -Math.PI / 2;
+    dimple.position.set(mx, yc + h / 2 + 0.005, zMouth - 3.2);
+  }
+  label("U1", mx, yT + 6, mz - 2);
+}
+
+// Pointing at a part in the list picks out its label on the board
+for (const item of document.querySelectorAll(".legend__item")) {
+  const el = labelEls[item.querySelector(".badge")?.textContent];
+  if (!el) {
+    continue;
+  }
+  item.addEventListener("pointerenter", () => el.classList.add("ref--active"));
+  item.addEventListener("pointerleave", () => el.classList.remove("ref--active"));
+}
+
+// ---------- controls ----------
+const topView = () => setView([0, 1, 0.0001], [0, 0, 0]);
+const underView = () => setView([0, -1, 0.0001], [0, -BOARD_T, 0]);
+document.getElementById("reset").addEventListener("click", resetView);
+document.getElementById("top").addEventListener("click", topView);
+document.getElementById("under").addEventListener("click", underView);
+// A step along the line to the target, kept inside the distances the mouse wheel allows
+function zoom(factor) {
+  const offset = camera.position.clone().sub(controls.target);
+  const d = THREE.MathUtils.clamp(offset.length() * factor, controls.minDistance, controls.maxDistance);
+  camera.position.copy(controls.target).addScaledVector(offset.normalize(), d);
+  controls.update();
+}
+const zoomIn = document.getElementById("zoom-in");
+const zoomOut = document.getElementById("zoom-out");
+zoomIn.addEventListener("click", () => zoom(0.8));
+zoomOut.addEventListener("click", () => zoom(1.25));
+// At either limit, however it was reached, the button that cannot go further is off
+function updateZoomButtons() {
+  const d = camera.position.distanceTo(controls.target);
+  zoomIn.disabled = d <= controls.minDistance + 0.01;
+  zoomOut.disabled = d >= controls.maxDistance - 0.01;
+}
+controls.addEventListener("change", updateZoomButtons);
+updateZoomButtons();
+const labelsBtn = document.getElementById("labels");
+labelsBtn.addEventListener("click", () => {
+  const on = labelsBtn.getAttribute("aria-pressed") !== "true";
+  labelsBtn.setAttribute("aria-pressed", String(on));
+  document.body.classList.toggle("hide-labels", !on);
+});
+// Open straight into a view with #top or #under in the address
+if (location.hash === "#top") {
+  topView();
+}
+if (location.hash === "#under") {
+  underView();
+}
+
+// A new view shape keeps the board the same share of it. The distance follows the fit, and any
+// zoom is kept.
+function fitToView() {
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  const before = fitDistance(dir, controls.target);
+  camera.aspect = view.clientWidth / view.clientHeight;
+  camera.updateProjectionMatrix();
+  const dist = camera.position.distanceTo(controls.target) * fitDistance(dir, controls.target) / before;
+  camera.position.copy(controls.target).addScaledVector(dir, dist);
+  controls.update();
+  renderer.setSize(view.clientWidth, view.clientHeight);
+  labelRenderer.setSize(view.clientWidth, view.clientHeight);
+  requestRender();
+}
+window.addEventListener("resize", fitToView);
+
+// Full screen is the 3D view alone; browsers without it for elements get no button
+const fullscreenBtn = document.getElementById("fullscreen");
+fullscreenBtn.hidden = !document.fullscreenEnabled;
+fullscreenBtn.addEventListener("click", () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    view.requestFullscreen();
+  }
+});
+document.addEventListener("fullscreenchange", () => {
+  fullscreenBtn.setAttribute("aria-label", document.fullscreenElement ? "Exit full screen" : "Full screen");
+  fitToView();
+});
+
+// The room is there for the metals to mirror; paint, plastic and epoxy take only a little of it,
+// which keeps the depth the lamps give their colors
+scene.traverse((o) => {
+  if (!o.isMesh) {
+    return;
+  }
+  for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+    if (m.isMeshStandardMaterial) {
+      // The share is per material only for a map the material holds itself
+      m.envMap = scene.environment;
+      m.envMapIntensity = m.metalness > 0.5 ? 0.7 : 0.25;
+    }
+  }
+});
+
+// A frame is drawn only when the view changes, since the scene never does. While damping eases
+// the camera, controls.update() moves it and fires "change", which asks for the next frame.
+let renderQueued = false;
+function render() {
+  renderQueued = false;
+  controls.update();
+  // Labels belong to the component side; hide them while looking from below
+  labelRenderer.domElement.style.visibility = camera.position.y < -BOARD_T ? "hidden" : "visible";
+  // The floor would lie between the camera and the board when looking from below
+  floorGrid.visible = camera.position.y > floorGrid.position.y;
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+  loading.hidden = true;
+}
+function requestRender() {
+  if (renderQueued) {
+    return;
+  }
+  renderQueued = true;
+  requestAnimationFrame(render);
+}
+controls.addEventListener("change", requestRender);
+requestRender();
+</script>
+</body>
+</html>

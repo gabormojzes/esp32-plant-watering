@@ -1,0 +1,5 @@
+---
+InheritParentConfig: true
+# unchecked-optional-access cannot see through doctest's REQUIRE and CHECK.
+Checks: >
+  -bugprone-unchecked-optional-access

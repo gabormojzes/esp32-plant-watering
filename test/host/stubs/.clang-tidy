@@ -1,0 +1,9 @@
+---
+InheritParentConfig: true
+# The stand-ins declare ESP-IDF's types, macros and enums as ESP-IDF does
+Checks: >
+  -readability-identifier-naming,
+  -modernize-use-using,
+  -modernize-macro-to-enum,
+  -performance-enum-size,
+  -readability-enum-initial-value
