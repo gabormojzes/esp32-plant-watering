@@ -3,9 +3,11 @@
 Firmware for ESP32-family microcontrollers that monitors soil moisture and automatically controls a
 water pump to maintain the desired moisture level.
 
-A hobby project, built for one moisture sensor and one pump. With the tubing split, the pump can
-water several plants, but all of them are watered on the reading from the one pot the sensor sits
-in.
+Built for one moisture sensor and one pump. With the tubing split, the pump can water several
+plants, but all of them are watered on the reading from the one pot the sensor sits in.
+
+<a href="docs/login-desktop-light.png"><img src="docs/login-desktop-light.png" alt="Login, desktop, light theme" title="Login, desktop, light theme" width="260"></a>
+<a href="docs/dashboard-desktop-light.png"><img src="docs/dashboard-desktop-light.png" alt="Dashboard, desktop, light theme" title="Dashboard, desktop, light theme" width="260"></a>
 
 ## Quick start
 
